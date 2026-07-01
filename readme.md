@@ -11,9 +11,7 @@ Stack: Flask + SQLite + React (via CDN, no build step). Single container.
 <img width="1094" height="834" alt="scipam1" src="https://github.com/user-attachments/assets/afbe6034-0c26-48e2-9d88-d5e6e419cc2a" />
 <img width="1087" height="481" alt="scipam4" src="https://github.com/user-attachments/assets/f9a97237-8e1f-4a07-b4f1-efd6be8bd162" />
 <img width="376" height="529" alt="scipam3" src="https://github.com/user-attachments/assets/9581fdc7-e55b-4643-9f97-725bed13f52f" />
-<img width="1087" height="481" alt="scipam4" src="https://github.com/user-attachments/assets/f9a97237-8e1f-4a07-b4f1-efd6be8bd162" />
 <img width="1134" height="700" alt="scipam2" src="https://github.com/user-attachments/assets/38ac2601-b03d-4bfb-8149-d2aaf49eb4a9" />
-<img width="1094" height="834" alt="scipam1" src="https://github.com/user-attachments/assets/afbe6034-0c26-48e2-9d88-d5e6e419cc2a" />
 
 # CSV Export Data
 <img width="998" height="126" alt="scipam5" src="https://github.com/user-attachments/assets/ecc9d988-1d13-4ee2-953f-5f08222e1dda" />
