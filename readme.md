@@ -34,7 +34,7 @@ docker compose up -d
 
 Open `http://<host>:20080`. Edit `app.py`/`static/index.html` on the host and
 `docker restart` to iterate. A `Dockerfile` + `requirements.txt` are included for
-building a real image (e.g. GHCR) later.
+image building.
 
 ## UniFi connection (API key)
 
@@ -90,18 +90,4 @@ provided, the app logs a warning and stays open (so you can't lock yourself out)
 ## Fonts
 
 Self-hosted. Drop `ethnocentric rg.otf` / `ethnocentric rg it.otf` into
-`static/fonts/` (see `static/fonts/README.txt`). Falls back to a mono stack.
-Font files are gitignored — don't commit licensed fonts.
-
-## Tests
-
-```bash
-python test_ipam.py    # CRUD, pools, CSV, settings, exclusion, lock, CIDR
-python test_sync.py    # sync grace/grey/move-to-Unallocated + exclusion lifecycle
-```
-
-## Committing to GitHub
-
-The included `.gitignore` excludes `data/`, all `*.db`, font files, and
-`__pycache__`. Only code is committed — no personal data, keys, or fonts. The DB
-is created fresh at runtime on whatever box runs it.
+`static/fonts/` include fonts of your choise update the html files as needed to reflect this.
