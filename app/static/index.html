@@ -1,0 +1,705 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Spazcat IPAM</title>
+<link rel="icon" type="image/svg+xml" href="/static/favicon.svg" />
+<link rel="apple-touch-icon" href="/static/favicon.svg" />
+<style>
+  /* Self-hosted fonts — copy the STODO Ethnocentric OTF files into
+     static/fonts/ exactly as named (spaces and all). Ethnocentric is a display
+     face used for the wordmark only; data rows stay on the mono stack. */
+  @font-face {
+    font-family: "Ethnocentric";
+    src: url("/static/fonts/ethnocentric%20rg.otf") format("opentype");
+    font-weight: 400; font-style: normal; font-display: swap;
+  }
+  @font-face {
+    font-family: "Ethnocentric";
+    src: url("/static/fonts/ethnocentric%20rg%20it.otf") format("opentype");
+    font-weight: 400; font-style: italic; font-display: swap;
+  }
+  :root {
+    --font-display: "Ethnocentric", "JetBrains Mono", ui-monospace, monospace;
+    --font-mono: "JetBrains Mono", "Fira Code", ui-monospace, SFMono-Regular, Menlo, monospace;
+    --fs: 18px;
+    --bg: #0a0a0c;
+    --panel: #141418;
+    --panel-2: #1b1b21;
+    --border: #2a2a33;
+    --text: #e6e6ea;
+    --muted: #8a8a96;
+    --accent: #8b5cf6;
+    --accent-2: #f5a142;
+    --danger: #ef4444;
+    --ok: #22c55e;
+  }
+  body.light {
+    --bg: #f4f4f7;
+    --panel: #ffffff;
+    --panel-2: #ececf1;
+    --border: #d3d3dd;
+    --text: #1a1a20;
+    --muted: #6a6a76;
+    --accent: #7c3aed;
+    --accent-2: #d97706;
+    --danger: #dc2626;
+    --ok: #16a34a;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--font-mono);
+    font-size: var(--fs);
+    transition: background .15s ease, color .15s ease;
+  }
+  .wrap { max-width: 1200px; margin: 0 auto; padding: 24px 18px 80px; }
+  header.top {
+    display: flex; align-items: center; justify-content: space-between;
+    margin-bottom: 22px; gap: 12px; flex-wrap: wrap;
+  }
+  .title {
+    font-family: var(--font-display);
+    font-weight: 800; letter-spacing: 3px; font-size: 24px;
+    background: linear-gradient(90deg, var(--accent), var(--accent-2));
+    -webkit-background-clip: text; background-clip: text; color: transparent;
+  }
+  .toolbar { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+  .count { color: var(--muted); font-size: 0.72em; margin-right: 6px; }
+  button {
+    font-family: inherit; font-size: 0.8em; cursor: pointer;
+    background: var(--panel-2); color: var(--text);
+    border: 1px solid var(--border); border-radius: 8px;
+    padding: 8px 12px; transition: all .15s ease;
+  }
+  button:hover { border-color: var(--accent); }
+  button.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+  button.primary:hover { filter: brightness(1.1); }
+  button.ghost { background: transparent; }
+  button.danger { color: var(--danger); border-color: transparent; }
+  button.danger:hover { border-color: var(--danger); }
+  .row-input {
+    width: 100%; background: var(--panel); color: var(--text);
+    border: 1px solid var(--border); border-radius: 10px;
+    padding: 12px 14px; font-family: inherit; font-size: 0.9em;
+  }
+  .row-input:focus { outline: none; border-color: var(--accent); }
+
+  .pool {
+    border: 1px solid var(--border); border-radius: 12px;
+    margin-bottom: 16px; overflow: hidden;
+  }
+  .pool-head {
+    display: flex; align-items: center; gap: 10px;
+    padding: 12px 14px; border-bottom: 1px solid var(--border);
+  }
+  .pool-dot { width: 12px; height: 12px; border-radius: 3px; flex: none; }
+  .pool-name { font-weight: 700; letter-spacing: 1px; font-size: 1em; }
+  .pool-meta { color: var(--muted); font-size: 0.82em; }
+  .pool-meta .sub { color: var(--accent-2); }
+  .pool-head .spacer { flex: 1; }
+  .pool-actions button { padding: 5px 9px; font-size: 0.72em; }
+  .pool-body { padding: 8px; min-height: 44px; }
+  .pool-body.drag-over { background: rgba(139,92,246,0.08); }
+  .empty-hint { color: var(--muted); font-size: 0.72em; padding: 10px 8px; }
+
+  .dev {
+    display: flex; align-items: center; gap: 12px;
+    padding: 10px 11px; border-radius: 8px; cursor: grab;
+    border: 1px solid transparent; border-left: 4px solid transparent;
+    font-size: 1em;
+  }
+  .dev:hover { border-color: var(--border); }
+  .dev.offline { opacity: 0.38; }
+  .dev.offline:hover { opacity: 0.85; }
+  .dev .grip { color: var(--muted); font-size: 1em; cursor: grab; }
+  .dev .ip { font-weight: 700; min-width: 8em; display: flex; align-items: center; gap: 6px; }
+  .dev .nm { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .dev .nm .host { color: var(--muted); font-size: 0.82em; margin-left: 6px; }
+  .dev .mac { color: var(--muted); font-size: 0.82em; min-width: 9em; }
+  .dev .badges { display: flex; gap: 5px; }
+  .tag {
+    font-size: 0.68em; padding: 2px 7px; border-radius: 5px;
+    border: 1px solid var(--border); color: var(--muted);
+  }
+  .tag.res { color: var(--accent-2); border-color: var(--accent-2); }
+  .tag.manual { color: var(--accent); border-color: var(--accent); }
+  .tag.dup { color: var(--danger); border-color: var(--danger); font-weight: 700; }
+  .lockbtn {
+    background: transparent; border: none; cursor: pointer; font-size: 0.85em;
+    padding: 2px 4px; opacity: 0.45; line-height: 1;
+  }
+  .lockbtn:hover { opacity: 1; border: none; }
+  .lockbtn.on { opacity: 1; }
+  .dev .ed { opacity: 0; display: flex; gap: 4px; }
+  .dev:hover .ed { opacity: 1; }
+  .ed button { padding: 4px 8px; font-size: 0.7em; }
+
+  .warn-banner {
+    background: rgba(239,68,68,0.12); border: 1px solid var(--danger);
+    color: #fecaca; border-radius: 10px; padding: 10px 14px;
+    margin-bottom: 16px; font-size: 0.82em; line-height: 1.5;
+  }
+  .warn-banner b { color: #fff; }
+  body.light .warn-banner { background: rgba(220,38,38,0.10); color: #991b1b; }
+  body.light .warn-banner b { color: #7f1d1d; }
+  .filters { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin-bottom: 18px; }
+  .filters .search { flex: 1; min-width: 200px; }
+  .toggle-btn.active { background: var(--accent-2); border-color: var(--accent-2); color: #14110b; font-weight: 700; }
+  .swatch-wheel {
+    width: 26px; height: 26px; border-radius: 7px; cursor: pointer;
+    padding: 0; border: 2px solid transparent; overflow: hidden;
+    background: conic-gradient(from 0deg,
+      #ef4444, #f5a142, #eab308, #22c55e, #06b6d4, #3b82f6, #8b5cf6, #ec4899, #ef4444);
+    -webkit-appearance: none; appearance: none;
+  }
+  .swatch-wheel.sel { border-color: var(--text); }
+  .swatch-wheel::-webkit-color-swatch-wrapper { padding: 0; }
+  .swatch-wheel::-webkit-color-swatch { border: none; opacity: 0; }
+  .swatch-wheel::-moz-color-swatch { border: none; opacity: 0; }
+
+  .excluded-block { margin-top: 6px; border-top: 1px solid var(--border); padding-top: 12px; }
+  .excluded-block > label { display: block; color: var(--muted); font-size: 0.82em; margin-bottom: 8px; }
+  .excluded-empty { color: var(--muted); font-size: 0.82em; }
+  .excluded-list { max-height: 170px; overflow-y: auto; display: flex; flex-direction: column; gap: 3px; }
+  .excluded-row { display: flex; align-items: center; gap: 10px; font-size: 0.82em; }
+  .excluded-row .ex-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .excluded-row .ex-ip { color: var(--muted); min-width: 6em; }
+  .excluded-row .ex-mac { color: var(--muted); }
+  .excluded-row button { padding: 3px 9px; }
+
+  /* modal */
+  .overlay {
+    position: fixed; inset: 0; background: rgba(0,0,0,0.6);
+    display: flex; align-items: center; justify-content: center; z-index: 50;
+  }
+  .modal {
+    background: var(--panel); border: 1px solid var(--border);
+    border-radius: 14px; padding: 20px; width: 440px; max-width: 92vw;
+    max-height: 88vh; overflow: auto;
+  }
+  .modal h3 { margin: 0 0 14px; letter-spacing: 1px; }
+  .field { margin-bottom: 12px; }
+  .field label { display: block; color: var(--muted); font-size: 0.72em; margin-bottom: 5px; }
+  .field input, .field textarea, .field select {
+    width: 100%; background: var(--panel-2); color: var(--text);
+    border: 1px solid var(--border); border-radius: 8px;
+    padding: 9px 11px; font-family: inherit; font-size: 0.85em;
+  }
+  .field input:focus, .field textarea:focus { outline: none; border-color: var(--accent); }
+  .swatches { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 4px; }
+  .swatch { width: 26px; height: 26px; border-radius: 7px; cursor: pointer; border: 2px solid transparent; }
+  .swatch.sel { border-color: #fff; }
+  .modal-actions { display: flex; justify-content: space-between; gap: 10px; margin-top: 18px; }
+  .modal-actions .right { display: flex; gap: 8px; }
+  .test-result { font-size: 0.72em; margin-top: 8px; }
+  .test-result.ok { color: var(--ok); }
+  .test-result.err { color: var(--danger); }
+  .add-bar { display: flex; gap: 10px; margin-bottom: 22px; }
+  .add-bar input { flex: 1; }
+  .toast {
+    position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%);
+    background: var(--panel-2); border: 1px solid var(--accent);
+    padding: 10px 18px; border-radius: 10px; font-size: 0.8em; z-index: 60;
+  }
+</style>
+</head>
+<body>
+<div id="root"></div>
+
+<script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+<script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+<script crossorigin src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+
+<script type="text/babel">
+const { useState, useEffect, useCallback } = React;
+
+const PALETTE = ["#8b5cf6","#f5a142","#22c55e","#06b6d4","#ec4899",
+                 "#eab308","#3b82f6","#ef4444","#14b8a6","#a855f7","#6b7280"];
+
+function hexToRgba(hex, a) {
+  const h = hex.replace("#","");
+  const n = parseInt(h.length===3 ? h.split("").map(c=>c+c).join("") : h, 16);
+  return `rgba(${(n>>16)&255},${(n>>8)&255},${n&255},${a})`;
+}
+
+async function api(path, opts) {
+  const r = await fetch(path, {
+    headers: {"Content-Type":"application/json"}, ...opts
+  });
+  if (r.status === 401) { window.location = "/login"; return {}; }
+  return r.json();
+}
+
+function App() {
+  const [state, setState] = useState({pools:[], settings:{}, total:0});
+  const [dragId, setDragId] = useState(null);
+  const [overPool, setOverPool] = useState(null);
+  const [editDevice, setEditDevice] = useState(null);
+  const [editPool, setEditPool] = useState(null);
+  const [showSettings, setShowSettings] = useState(false);
+  const [toast, setToast] = useState(null);
+  const [newItem, setNewItem] = useState("");
+  const [query, setQuery] = useState("");
+  const [resOnly, setResOnly] = useState(false);
+  // localStorage is only a pre-load hint to avoid a flash; the DB (per-instance)
+  // is the source of truth, applied once state loads and pushed back on change.
+  const [theme, setThemeState] = useState(
+    (typeof localStorage!=="undefined" && localStorage.getItem("ipam-theme")) || "dark");
+  const [fs, setFsState] = useState(() => {
+    const v = (typeof localStorage!=="undefined" && localStorage.getItem("ipam-fs"));
+    return v ? parseInt(v) : 18;
+  });
+  const bootstrapped = React.useRef(false);
+
+  useEffect(() => {
+    document.body.classList.toggle("light", theme === "light");
+    try { localStorage.setItem("ipam-theme", theme); } catch(e) {}
+  }, [theme]);
+  useEffect(() => {
+    document.documentElement.style.setProperty("--fs", fs + "px");
+    try { localStorage.setItem("ipam-fs", String(fs)); } catch(e) {}
+  }, [fs]);
+
+  // user-initiated changes: update UI immediately AND persist to the instance
+  const setTheme = (t) => { setThemeState(t); api("/api/settings", {method:"PUT", body: JSON.stringify({theme:t})}); };
+  const setFs = (n) => { setFsState(n); api("/api/settings", {method:"PUT", body: JSON.stringify({font_size:n})}); };
+
+  const load = useCallback(async () => {
+    const s = await api("/api/state");
+    setState(s);
+    // apply instance-stored appearance once, on first load
+    if (!bootstrapped.current && s.settings) {
+      bootstrapped.current = true;
+      if (s.settings.theme) setThemeState(s.settings.theme);
+      if (s.settings.font_size) setFsState(s.settings.font_size);
+    }
+  }, []);
+  useEffect(() => { load(); }, [load]);
+  useEffect(() => {
+    const t = setInterval(() => { load(); }, 30000); // reflect auto-sync changes
+    return () => clearInterval(t);
+  }, [load]);
+
+  const flash = (m) => { setToast(m); setTimeout(()=>setToast(null), 3000); };
+
+  const onDrop = async (poolId) => {
+    setOverPool(null);
+    if (dragId == null) return;
+    await api(`/api/devices/${dragId}`, {method:"PUT", body: JSON.stringify({pool_id: poolId})});
+    setDragId(null);
+    load();
+  };
+
+  const sync = async () => {
+    flash("Syncing with UniFi…");
+    const r = await api("/api/sync", {method:"POST"});
+    if (r.ok) {
+      const ex = r.skipped ? `, ${r.skipped} excluded` : "";
+      flash(`Synced (${r.mode}): +${r.added} new, ${r.greyed} offline, ${r.moved} → Unallocated${ex}`);
+      load();
+    } else {
+      flash("Sync failed: " + r.error);
+    }
+  };
+
+  const quickAdd = async () => {
+    const v = newItem.trim();
+    if (!v) return;
+    // smart parse: if it looks like an IP, use as ip, else name
+    const isIp = /^\d{1,3}(\.\d{1,3}){3}$/.test(v);
+    await api("/api/devices", {method:"POST", body: JSON.stringify(isIp ? {ip:v} : {name:v})});
+    setNewItem("");
+    load();
+  };
+
+  const q = query.trim().toLowerCase();
+  // IP-ish query (digits + dots): match on octet boundaries so "10.0.1.2"
+  // does NOT match "10.0.1.200". Every typed octet must equal the IP's octet.
+  const ipish = /^[0-9.]+$/.test(q) && q.includes(".");
+  const qOctets = ipish ? q.split(".").filter((s,i,a)=>!(s===""&&i===a.length-1)) : [];
+  const ipMatch = (ip) => {
+    if (!ipish) return false;
+    const io = (ip||"").split(".");
+    return qOctets.length <= io.length && qOctets.every((o,i)=> io[i] === o);
+  };
+  const textMatch = (d) => {
+    const fields = ipish ? [d.name,d.hostname,d.mac,d.notes]
+                         : [d.ip,d.name,d.hostname,d.mac,d.notes];
+    return fields.some(v => (v||"").toLowerCase().includes(q));
+  };
+  const poolHitFn = (p) => !!q && [p.name,p.notes,p.subnets].some(v => (v||"").toLowerCase().includes(q));
+  const filtering = !!q || resOnly;
+  const matchDev = (d, poolHit) => {
+    if (resOnly && !d.is_reserved) return false;
+    if (!q) return true;
+    if (poolHit) return true;               // section name / notes / subnet hit
+    return ipMatch(d.ip) || textMatch(d);
+  };
+  const shownPools = state.pools
+    .map(p => { const ph = poolHitFn(p); return {...p, devices: p.devices.filter(d=>matchDev(d,ph))}; })
+    .filter(p => !filtering || p.devices.length > 0);
+
+  return (
+    <div className="wrap">
+      <header className="top">
+        <div className="title">SPAZCAT IPAM</div>
+        <div className="toolbar">
+          <span className="count">{state.total} devices</span>
+          <button onClick={sync} className="primary">⟳ Sync UniFi</button>
+          <button onClick={()=>window.location="/api/export.csv"}>⤓ CSV</button>
+          <button onClick={()=>setEditPool({color:"#8b5cf6"})}>+ Pool</button>
+          <button onClick={()=>setTheme(theme==="dark"?"light":"dark")} className="ghost"
+            title="Toggle light / dark">{theme==="dark" ? "☀" : "🌙"}</button>
+          <button className="ghost" title="Smaller text" style={{padding:"6px 9px"}}
+            onClick={()=>setFs(Math.max(12, fs-1))}>A−</button>
+          <button className="ghost" title="Larger text" style={{padding:"6px 9px", fontSize:"1.15em"}}
+            onClick={()=>setFs(Math.min(26, fs+1))}>A+</button>
+          <button onClick={()=>setShowSettings(true)} className="ghost">⚙</button>
+          {state.settings.auth_enabled && (
+            <button className="ghost" title="Sign out"
+              onClick={async()=>{ await api("/api/logout",{method:"POST"}); window.location="/login"; }}>
+              <span style={{fontSize:"0.8em"}}>⎋ logout</span>
+            </button>
+          )}
+        </div>
+      </header>
+
+      {state.duplicates && state.duplicates.length > 0 && (
+        <div className="warn-banner">
+          ⚠ <b>Duplicate IP{state.duplicates.length>1?"s":""} in use:</b>{" "}
+          {state.duplicates.map((x,i)=>(
+            <span key={x.ip}>{i>0 && "  •  "}<b>{x.ip}</b> — {x.devices.join(", ")}</span>
+          ))}
+        </div>
+      )}
+
+      <div className="add-bar">
+        <input className="row-input" placeholder="Quick add device (name or IP)…"
+          value={newItem} onChange={e=>setNewItem(e.target.value)}
+          onKeyDown={e=>{if(e.key==="Enter") quickAdd();}} />
+        <button className="primary" onClick={quickAdd}>ADD</button>
+      </div>
+
+      <div className="filters">
+        <input className="row-input search" placeholder="🔍 Search ip / name / notes / mac…"
+          value={query} onChange={e=>setQuery(e.target.value)} />
+        <button className={"toggle-btn"+(resOnly?" active":"")}
+          onClick={()=>setResOnly(!resOnly)}>RES only</button>
+        {filtering && <button onClick={()=>{setQuery("");setResOnly(false);}}>clear</button>}
+      </div>
+
+      {shownPools.map(pool => (
+        <Pool key={pool.id} pool={pool}
+          dragId={dragId} setDragId={setDragId}
+          overPool={overPool} setOverPool={setOverPool}
+          onDrop={onDrop}
+          onEditDevice={setEditDevice}
+          onEditPool={setEditPool}
+          reload={load} flash={flash} filtering={filtering} />
+      ))}
+
+      {editDevice && (
+        <DeviceModal device={editDevice} pools={state.pools}
+          onClose={()=>setEditDevice(null)} reload={load} />
+      )}
+      {editPool && (
+        <PoolModal pool={editPool}
+          onClose={()=>setEditPool(null)} reload={load} />
+      )}
+      {showSettings && (
+        <SettingsModal settings={state.settings} excluded={state.excluded||[]}
+          onClose={()=>setShowSettings(false)} reload={load} flash={flash} />
+      )}
+      {toast && <div className="toast">{toast}</div>}
+    </div>
+  );
+}
+
+function Pool({pool, dragId, setDragId, overPool, setOverPool, onDrop,
+               onEditDevice, onEditPool, reload, flash}) {
+  const faint = hexToRgba(pool.color, 0.07);
+  const isOver = overPool === pool.id;
+
+  const delPool = async () => {
+    if (!confirm(`Delete pool "${pool.name}"? Devices move to Unallocated.`)) return;
+    await api(`/api/pools/${pool.id}`, {method:"DELETE"});
+    reload();
+  };
+
+  return (
+    <div className="pool" style={{background: faint, borderColor: hexToRgba(pool.color,0.35)}}>
+      <div className="pool-head" style={{background: hexToRgba(pool.color,0.12)}}>
+        <span className="pool-dot" style={{background: pool.color}}></span>
+        <span className="pool-name">{pool.name}</span>
+        {pool.subnets && <span className="pool-meta sub">[{pool.subnets}]</span>}
+        {pool.notes && <span className="pool-meta">— {pool.notes}</span>}
+        <span className="spacer"></span>
+        <span className="pool-meta">{pool.devices.length}</span>
+        <div className="pool-actions" style={{display:"flex",gap:"6px",marginLeft:"8px"}}>
+          <button onClick={()=>onEditPool(pool)}>edit</button>
+          {!pool.is_default && <button className="danger" onClick={delPool}>×</button>}
+        </div>
+      </div>
+      <div className={"pool-body" + (isOver ? " drag-over" : "")}
+        onDragOver={e=>{e.preventDefault(); setOverPool(pool.id);}}
+        onDragLeave={()=>setOverPool(null)}
+        onDrop={()=>onDrop(pool.id)}>
+        {pool.devices.length === 0 && (
+          <div className="empty-hint">No devices — drag one here.</div>
+        )}
+        {pool.devices.map(d => (
+          <Device key={d.id} d={d} poolColor={pool.color} setDragId={setDragId}
+            onEdit={()=>onEditDevice(d)} reload={reload} />
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function Device({d, poolColor, setDragId, onEdit, reload}) {
+  const del = async (e) => {
+    e.stopPropagation();
+    const msg = d.mac
+      ? `Delete ${d.name || d.ip || d.mac}?\n\nThis excludes it permanently — UniFi syncs won't re-add it. You can restore it later from Settings → Excluded devices.`
+      : `Delete ${d.name || d.ip || "this device"}?`;
+    if (!confirm(msg)) return;
+    await api(`/api/devices/${d.id}`, {method:"DELETE"});
+    reload();
+  };
+  const toggleLock = async (e) => {
+    e.stopPropagation();
+    await api(`/api/devices/${d.id}`, {method:"PUT", body: JSON.stringify({locked: !d.locked})});
+    reload();
+  };
+  // online = stronger (pool-color accent + wash); offline recedes via .offline opacity
+  const style = d.is_online
+    ? { borderLeftColor: poolColor, background: hexToRgba(poolColor, 0.32) }
+    : { borderLeftColor: "transparent" };
+  return (
+    <div className={"dev" + (d.is_online ? "" : " offline")} style={style}
+      draggable onDragStart={()=>setDragId(d.id)} onDragEnd={()=>setDragId(null)}>
+      <span className="grip">⠿</span>
+      <span className="ip">
+        {d.ip || "—"}
+        {d.dup_ip && <span className="tag dup" title="This IP is used by more than one device">⚠</span>}
+      </span>
+      <span className="nm">
+        {d.name || d.hostname || "(unnamed)"}
+        {d.name && d.hostname && <span className="host">{d.hostname}</span>}
+      </span>
+      <span className="mac">{d.mac || ""}</span>
+      <span className="badges">
+        {d.is_reserved ? <span className="tag res">RES</span> : null}
+        {d.source === "manual" ? <span className="tag manual">MANUAL</span> : null}
+        {!d.is_online ? <span className="tag">OFFLINE</span> : null}
+      </span>
+      <button className={"lockbtn" + (d.locked ? " on" : "")} onClick={toggleLock}
+        title={d.locked ? "Locked — protected from grace-period fallback" : "Unlocked — click to lock in place"}>
+        {d.locked ? "🔒" : "🔓"}
+      </button>
+      <span className="ed">
+        <button onClick={onEdit}>edit</button>
+        <button className="danger" onClick={del}>×</button>
+      </span>
+    </div>
+  );
+}
+
+function DeviceModal({device, pools, onClose, reload}) {
+  const [f, setF] = useState({
+    name: device.name||"", hostname: device.hostname||"", ip: device.ip||"",
+    mac: device.mac||"", notes: device.notes||"", pool_id: device.pool_id,
+    is_reserved: !!device.is_reserved, locked: !!device.locked,
+  });
+  const isNew = !device.id;
+  const save = async () => {
+    if (isNew) {
+      await api("/api/devices", {method:"POST", body: JSON.stringify(f)});
+    } else {
+      await api(`/api/devices/${device.id}`, {method:"PUT", body: JSON.stringify(f)});
+    }
+    onClose(); reload();
+  };
+  const set = (k,v)=>setF({...f,[k]:v});
+  return (
+    <div className="overlay" onClick={onClose}>
+      <div className="modal" onClick={e=>e.stopPropagation()}>
+        <h3>{isNew ? "Add device" : "Edit device"}</h3>
+        <div className="field"><label>Name</label>
+          <input value={f.name} onChange={e=>set("name",e.target.value)} /></div>
+        <div className="field"><label>IP</label>
+          <input value={f.ip} onChange={e=>set("ip",e.target.value)} /></div>
+        <div className="field"><label>MAC</label>
+          <input value={f.mac} onChange={e=>set("mac",e.target.value)} /></div>
+        <div className="field"><label>Hostname</label>
+          <input value={f.hostname} onChange={e=>set("hostname",e.target.value)} /></div>
+        <div className="field"><label>Pool</label>
+          <select value={f.pool_id} onChange={e=>set("pool_id",parseInt(e.target.value))}>
+            {pools.map(p=><option key={p.id} value={p.id}>{p.name}</option>)}
+          </select></div>
+        <div className="field"><label>
+          <input type="checkbox" style={{width:"auto",marginRight:"8px"}}
+            checked={f.is_reserved} onChange={e=>set("is_reserved",e.target.checked)} />
+          Reserved IP</label></div>
+        <div className="field"><label>
+          <input type="checkbox" style={{width:"auto",marginRight:"8px"}}
+            checked={f.locked} onChange={e=>set("locked",e.target.checked)} />
+          Lock in place (never auto-move to Unallocated, even if offline &gt; grace period)</label></div>
+        <div className="field"><label>Notes</label>
+          <textarea rows="2" value={f.notes} onChange={e=>set("notes",e.target.value)} /></div>
+        <div className="modal-actions">
+          <span></span>
+          <div className="right">
+            <button onClick={onClose}>Cancel</button>
+            <button className="primary" onClick={save}>Save</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function PoolModal({pool, onClose, reload}) {
+  const [f, setF] = useState({
+    name: pool.name||"", color: pool.color||"#8b5cf6",
+    subnets: pool.subnets||"", notes: pool.notes||"",
+  });
+  const [err, setErr] = useState(null);
+  const isNew = !pool.id;
+  const set = (k,v)=>setF({...f,[k]:v});
+  const save = async () => {
+    setErr(null);
+    const r = isNew
+      ? await api("/api/pools", {method:"POST", body: JSON.stringify(f)})
+      : await api(`/api/pools/${pool.id}`, {method:"PUT", body: JSON.stringify(f)});
+    if (r && r.error) { setErr(r.error); return; }
+    onClose(); reload();
+  };
+  return (
+    <div className="overlay" onClick={onClose}>
+      <div className="modal" onClick={e=>e.stopPropagation()}>
+        <h3>{isNew ? "New pool" : "Edit pool"}</h3>
+        <div className="field"><label>Name</label>
+          <input value={f.name} onChange={e=>set("name",e.target.value)}
+            placeholder="Cameras" /></div>
+        <div className="field"><label>Subnets — CIDR only, comma-separated (e.g. 10.0.20.0/24)</label>
+          <input value={f.subnets} onChange={e=>set("subnets",e.target.value)}
+            placeholder="10.0.20.0/24" /></div>
+        <div className="field"><label>Notes</label>
+          <input value={f.notes} onChange={e=>set("notes",e.target.value)}
+            placeholder="POE cameras on VLAN 20" /></div>
+        <div className="field"><label>Color</label>
+          <div className="swatches">
+            {PALETTE.map(c=>(
+              <div key={c} className={"swatch"+(f.color===c?" sel":"")}
+                style={{background:c}} onClick={()=>set("color",c)} />
+            ))}
+            <input type="color"
+              className={"swatch-wheel"+(PALETTE.includes(f.color)?"":" sel")}
+              value={f.color} onChange={e=>set("color",e.target.value)}
+              title="Custom color" />
+          </div></div>
+        {err && <div className="test-result err">{err}</div>}
+        <div className="modal-actions">
+          <span></span>
+          <div className="right">
+            <button onClick={onClose}>Cancel</button>
+            <button className="primary" onClick={save}>Save</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function SettingsModal({settings, excluded, onClose, reload, flash}) {
+  const [f, setF] = useState({
+    unifi_host: settings.unifi_host||"", unifi_api_key: "",
+    unifi_site: settings.unifi_site||"default",
+    unifi_verify_ssl: !!settings.unifi_verify_ssl,
+    grace_days: settings.grace_days||7,
+    auto_sync_minutes: settings.auto_sync_minutes||0,
+  });
+  const [test, setTest] = useState(null);
+  const set = (k,v)=>setF({...f,[k]:v});
+  const save = async () => {
+    await api("/api/settings", {method:"PUT", body: JSON.stringify(f)});
+    flash(f.unifi_api_key ? "Settings saved — API key updated" : "Settings saved");
+    onClose(); reload();
+  };
+  const doTest = async () => {
+    setTest({msg:"Testing…"});
+    const r = await api("/api/unifi/test", {method:"POST", body: JSON.stringify(f)});
+    setTest(r.ok ? {ok:true, msg:`Connected (${r.mode}) — ${r.count} clients`}
+                 : {ok:false, msg:r.error});
+  };
+  const restore = async (mac) => {
+    await api(`/api/excluded/${encodeURIComponent(mac)}`, {method:"DELETE"});
+    flash("Restored — will re-add on next sync if UniFi still sees it");
+    reload();
+  };
+  return (
+    <div className="overlay" onClick={onClose}>
+      <div className="modal" onClick={e=>e.stopPropagation()}>
+        <h3>Settings</h3>
+        <div className="field"><label>UniFi console host</label>
+          <input value={f.unifi_host} onChange={e=>set("unifi_host",e.target.value)}
+            placeholder="https://10.0.1.1 or unifi.ponsys.com" /></div>
+        <div className="field"><label>
+          API key {settings.unifi_key_set
+            ? <span style={{color:"var(--ok)"}}>✓ saved — leave blank to keep</span>
+            : <span style={{color:"var(--danger)"}}>not set</span>}
+        </label>
+          <input type="password" value={f.unifi_api_key}
+            onChange={e=>set("unifi_api_key",e.target.value)}
+            placeholder={settings.unifi_key_set ? "•••••••• (stored)" : "Network app → Settings → Integrations"} /></div>
+        <div className="field"><label>Site</label>
+          <input value={f.unifi_site} onChange={e=>set("unifi_site",e.target.value)} /></div>
+        <div className="field"><label>
+          <input type="checkbox" style={{width:"auto",marginRight:"8px"}}
+            checked={f.unifi_verify_ssl} onChange={e=>set("unifi_verify_ssl",e.target.checked)} />
+          Verify TLS certificate (off for self-signed)</label></div>
+        <div className="field"><label>Auto-sync every N minutes (0 = manual only)</label>
+          <input type="number" min="0" value={f.auto_sync_minutes}
+            onChange={e=>set("auto_sync_minutes",e.target.value)} /></div>
+        <div className="field"><label>Grace period (days offline before a device falls back to Unallocated)</label>
+          <input type="number" value={f.grace_days}
+            onChange={e=>set("grace_days",e.target.value)} /></div>
+        {test && <div className={"test-result "+(test.ok?"ok":"err")}>{test.msg}</div>}
+
+        <div className="excluded-block">
+          <label>Excluded devices {excluded.length ? `(${excluded.length})` : ""}</label>
+          {excluded.length === 0
+            ? <div className="excluded-empty">Nothing excluded. Deleting a UniFi device adds it here.</div>
+            : <div className="excluded-list">
+                {excluded.map(x=>(
+                  <div className="excluded-row" key={x.mac}>
+                    <span className="ex-name">{x.name || "(unnamed)"}</span>
+                    <span className="ex-ip">{x.ip}</span>
+                    <span className="ex-mac">{x.mac}</span>
+                    <button onClick={()=>restore(x.mac)}>restore</button>
+                  </div>
+                ))}
+              </div>}
+        </div>
+
+        <div className="modal-actions">
+          <button onClick={doTest}>Test connection</button>
+          <div className="right">
+            <button onClick={onClose}>Cancel</button>
+            <button className="primary" onClick={save}>Save</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById("root")).render(<App />);
+</script>
+</body>
+</html>
