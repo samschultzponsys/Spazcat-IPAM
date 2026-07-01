@@ -6,7 +6,7 @@
 # mono stack). To restore them, uncomment the fonts bind-mount below.
 services:
   spazcat-ipam:
-    image: ghcr.io/OWNER/REPO:latest
+    image: ghcr.io/samschultzponsys/spazcat-ipam:latest
     container_name: spazcat-ipam
     pull_policy: always
     environment:
