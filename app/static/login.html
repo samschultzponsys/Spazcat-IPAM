@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Spazcat IPAM — Sign in</title>
+<link rel="icon" type="image/svg+xml" href="/static/favicon.svg" />
+<style>
+  @font-face {
+    font-family: "Ethnocentric";
+    src: url("/static/fonts/ethnocentric%20rg.otf") format("opentype");
+    font-weight: 400; font-style: normal; font-display: swap;
+  }
+  :root {
+    --bg: #0a0a0c; --panel: #141418; --border: #2a2a33; --text: #e6e6ea;
+    --muted: #8a8a96; --accent: #8b5cf6; --accent-2: #f5a142; --danger: #ef4444;
+    --mono: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; min-height: 100vh; background: var(--bg); color: var(--text);
+    font-family: var(--mono); display: flex; align-items: center; justify-content: center;
+  }
+  .card {
+    width: 340px; max-width: calc(100vw - 32px);
+    background: var(--panel); border: 1px solid var(--border);
+    border-radius: 14px; padding: 28px 26px;
+  }
+  .brand {
+    font-family: "Ethnocentric", var(--mono); font-weight: 800; letter-spacing: 2px;
+    font-size: 20px; text-align: center; margin-bottom: 22px;
+    background: linear-gradient(90deg, var(--accent), var(--accent-2));
+    -webkit-background-clip: text; background-clip: text; color: transparent;
+  }
+  label { display: block; color: var(--muted); font-size: 12px; margin: 12px 0 5px; }
+  input {
+    width: 100%; background: var(--bg); color: var(--text);
+    border: 1px solid var(--border); border-radius: 9px;
+    padding: 11px 13px; font-family: var(--mono); font-size: 14px;
+  }
+  input:focus { outline: none; border-color: var(--accent); }
+  button {
+    width: 100%; margin-top: 20px; padding: 12px; cursor: pointer;
+    background: var(--accent); color: #fff; border: none; border-radius: 9px;
+    font-family: var(--mono); font-size: 14px; font-weight: 700;
+  }
+  button:hover { filter: brightness(1.1); }
+  .err {
+    color: var(--danger); font-size: 12px; margin-top: 14px; min-height: 16px; text-align: center;
+  }
+</style>
+</head>
+<body>
+  <div class="card">
+    <div class="brand">SPAZCAT IPAM</div>
+    <label for="u">Username</label>
+    <input id="u" autocomplete="username" autofocus />
+    <label for="p">Password</label>
+    <input id="p" type="password" autocomplete="current-password" />
+    <button id="go">Sign in</button>
+    <div class="err" id="err"></div>
+  </div>
+<script>
+  const err = document.getElementById("err");
+  async function submit() {
+    err.textContent = "";
+    const username = document.getElementById("u").value;
+    const password = document.getElementById("p").value;
+    try {
+      const r = await fetch("/api/login", {
+        method: "POST",
+        headers: {"Content-Type": "application/json"},
+        body: JSON.stringify({username, password}),
+      });
+      const d = await r.json();
+      if (d.ok) { window.location = "/"; }
+      else { err.textContent = d.error || "Sign in failed"; }
+    } catch (e) { err.textContent = "Network error"; }
+  }
+  document.getElementById("go").addEventListener("click", submit);
+  document.querySelectorAll("input").forEach(el =>
+    el.addEventListener("keydown", e => { if (e.key === "Enter") submit(); }));
+</script>
+</body>
+</html>
