@@ -648,7 +648,7 @@ function SettingsModal({settings, excluded, onClose, reload, flash}) {
         <h3>Settings</h3>
         <div className="field"><label>UniFi console host</label>
           <input value={f.unifi_host} onChange={e=>set("unifi_host",e.target.value)}
-            placeholder="https://10.0.1.1 or unifi.ponsys.com" /></div>
+            placeholder="https://10.0.1.1 or unifi.yourdomain.com" /></div>
         <div className="field"><label>
           API key {settings.unifi_key_set
             ? <span style={{color:"var(--ok)"}}>✓ saved — leave blank to keep</span>
