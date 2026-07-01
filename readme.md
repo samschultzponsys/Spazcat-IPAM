@@ -1,6 +1,6 @@
 # Spazcat IPAM
 
-A lightweight, self-hosted IP Address Management tool. UniFi stays your DHCP
+A lightweight, self-hosted IP Address Management tool. UniFi as standard stays your DHCP
 source of truth; this is the planning + visualization layer on top of it —
 color-coded pools, drag-and-drop device assignment, duplicate-IP detection, and
 CSV export so you're never locked to one DHCP server.
@@ -24,17 +24,52 @@ The API key and session secret are stored in the DB in plaintext, protected by
 filesystem permissions — standard for self-hosted tools, and the DB never leaves
 your box. Keep `data/` off any shared/synced location.
 
-## Deploy (no Dockerfile)
+## Repo layout
+ 
+```
+.
+├── Dockerfile              # builds the image (COPY app/…)
+├── compose.manual.yaml     # manual deploy: runtime-pip, bind-mounts ./app
+├── compose.yaml            # image deploy: runs the prebuilt GHCR image
+├── .github/workflows/      # Action that builds + pushes to GHCR
+├── .gitignore              # excludes data/, *.db, fonts
+└── app/
+    ├── app.py
+    ├── requirements.txt
+    └── static/             # index.html, login.html, favicon.svg, fonts/
+```
+All deploy methods run off this one tree, so GitHub stays the single source of
+truth. Everything is relative to the repo, so `git pull` + restart is the whole
+update loop.
 
+## Deploy
+ 
+Clone the repo onto the host, then pick a method (all serve on port 20080).
+Carrying over an existing instance: copy your existing `ipam.db` into `./data/`
+before first start (it's gitignored, so it never came from the repo).
+ 
+**A. Manual (no image build)** — edits are live on restart:
 ```bash
-mkdir -p /path/to/spazcat-ipam/{app,data}
-# copy app.py + static/ into .../spazcat-ipam/app/
 docker compose up -d
 ```
-
-Open `http://<host>:20080`. Edit `app.py`/`static/index.html` on the host and
-`docker restart` to iterate. A `Dockerfile` + `requirements.txt` are included for
-image building.
+Uses `compose.manual.yaml`: stock python image, installs deps at start, bind-mounts
+`./app`. To update: `git pull && docker compose restart`.
+ 
+**B. Docker image (from GHCR)** — after the Action publishes the image:
+```bash
+# edit compose.image.yaml for your needs!
+docker compose -f compose.yaml up -d
+```
+To update: `docker compose -f compose.yaml pull && … up -d`.
+ 
+**C. Bare metal (no Docker at all)**:
+```bash
+cd app
+pip install -r requirements.txt
+IPAM_DB=./data/ipam.db python app.py
+```
+ 
+A `Dockerfile` is included for building the image yourself or via the Action.
 
 ## UniFi connection (API key)
 
