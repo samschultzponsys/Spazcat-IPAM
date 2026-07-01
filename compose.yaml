@@ -1,0 +1,31 @@
+# MANUAL deploy (no image build). Uses the stock python image, installs deps at
+# container start, and bind-mounts the repo's app/ so edits are live on restart.
+# Run this from the repo root:  docker compose up -d
+#
+# Paths are relative to this file, so it works wherever the repo is checked out.
+# data/ is gitignored and created here on first run (holds the DB: API key,
+# devices, settings). To carry over an existing instance, drop your existing
+# ipam.db into ./data/ before starting.
+services:
+  spazcat-ipam:
+    image: python:3.12-slim
+    container_name: spazcat-ipam
+    working_dir: /app
+    command: sh -c "pip install --no-cache-dir -r requirements.txt && python app.py"
+    environment:
+      TZ: America/Chicago
+      PORT: "20080"
+      IPAM_DB: /data/ipam.db
+
+      # --- Optional auth (enable to expose to WAN) ---
+      # IPAM_AUTH_ENABLED: "true"
+      # IPAM_AUTH_USER: "sam"
+      # IPAM_AUTH_PASSWORD: "change-me"          # or IPAM_AUTH_PASSWORD_HASH
+      # IPAM_SESSION_DAYS: "30"
+      # IPAM_COOKIE_SECURE: "true"               # when behind HTTPS
+    volumes:
+      - ./app:/app
+      - ./data:/data
+    ports:
+      - "20080:20080"
+    restart: unless-stopped
