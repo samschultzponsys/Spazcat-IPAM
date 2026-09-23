@@ -1,11 +1,11 @@
 # MANUAL deploy (no image build). Uses the stock python image, installs deps at
 # container start, and bind-mounts the repo's app/ so edits are live on restart.
-# Run this from the repo root:  docker compose up -d
+# Run this from the repo root:  docker compose -f compose.manual.yaml up -d
 #
 # Paths are relative to this file, so it works wherever the repo is checked out.
 # data/ is gitignored and created here on first run (holds the DB: API key,
-# devices, settings). To carry over an existing instance, drop your existing
-# ipam.db into ./data/ before starting.
+# devices, settings, backups/, optional fonts/). To carry over an existing
+# instance, drop your existing ipam.db into ./data/ before starting.
 services:
   spazcat-ipam:
     image: python:3.12-slim
@@ -26,6 +26,8 @@ services:
     volumes:
       - ./app:/app
       - ./data:/data
+      # version + in-app changelog (the image copies this in; here we mount it)
+      - ./CHANGELOG.md:/CHANGELOG.md:ro
     ports:
       - "20080:20080"
     restart: unless-stopped
