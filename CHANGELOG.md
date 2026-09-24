@@ -4,6 +4,36 @@ Versions are always `MAJOR.MINOR` with a single-digit minor: `1.0`, `1.1` … `1
 The newest `## x.y` heading below is the version the app reports and the tag the
 GitHub Action publishes the image under — bump it here and nowhere else.
 
+## 1.3 — 2026-09-24
+
+### Added
+- **Sign-in is configured in the app.** Settings → Security now lets you:
+  - pick the methods for LAN and WAN
+  - add and remove users and change passwords
+  - create and revoke access tokens (each shown once, with a ready-made link)
+  - set up SSO (OIDC), including a **Test provider** button, the redirect URI to copy,
+    the button text and auto sign-in
+  - set networks, trusted proxies and session length
+- **Secure by default.** New installs require sign-in on LAN and WAN as user
+  `admin`, with a random password printed in a box in the container log
+  (`docker logs spazcat-ipam`). The box reappears on every start until you change
+  the password, and a banner in the app reminds you too.
+- **Environment variables override the UI.** Every `IPAM_AUTH_*` / `IPAM_OIDC_*`
+  variable still works; a field it sets shows as locked in the UI. Use them to
+  recover from a broken config, or set `IPAM_AUTH_RESET=true` once to restore the
+  defaults with a new admin password.
+- **HTTP Basic auth** with a password user, for scripts.
+- **40 preset pool colors** (was 11), plus a hex color field.
+
+### Changed
+- **Upgrading from 1.2 without `IPAM_AUTH_*` variables turns sign-in on.** Get the
+  admin password from `docker logs spazcat-ipam`, then change it, or allow
+  "No sign-in" on your LAN in Settings → Security.
+- Only someone signed in with a password or SSO can change security settings. On a
+  network with no sign-in, the Security tab has a "Sign in to edit" link. Saves that
+  would lock you out are refused or need confirming.
+- Access tokens are stored hashed.
+
 ## 1.2 — 2026-09-24
 
 ### Added

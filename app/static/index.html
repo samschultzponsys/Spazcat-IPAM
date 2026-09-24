@@ -118,6 +118,19 @@
   .sec-warn { color: var(--danger); font-size: 0.74em; margin-bottom: 8px; line-height: 1.45; }
   .pill { display: inline-block; padding: 1px 8px; border-radius: 999px; border: 1px solid var(--border); margin: 0 4px 2px 0; }
   .pill.on { border-color: var(--ok); color: var(--ok); }
+  .tag.env { margin-left: 6px; color: var(--accent-2); border-color: var(--accent-2); }
+  .zone-row { display: flex; flex-wrap: wrap; gap: 6px 16px; }
+  .zone-opt { display: flex !important; align-items: center; gap: 6px; font-size: 0.8em !important; color: var(--text) !important; margin: 0 !important; }
+  .zone-opt input { width: auto !important; }
+  details.sec-more { border: 1px solid var(--border); border-radius: 10px; padding: 8px 12px; margin-bottom: 10px; }
+  details.sec-more summary { cursor: pointer; font-size: 0.8em; color: var(--muted); }
+  details.sec-more[open] summary { margin-bottom: 10px; }
+  input.mini {
+    background: var(--panel-2); color: var(--text); border: 1px solid var(--border);
+    border-radius: 7px; padding: 5px 8px; font-family: inherit; font-size: 0.8em; min-width: 0;
+  }
+  .inline-add { display: flex; gap: 6px; margin-top: 8px; flex-wrap: wrap; }
+  .inline-add input.mini { flex: 1; }
   .pool-actions button { padding: 5px 9px; font-size: 0.72em; }
   .pool-body { padding: 8px; min-height: 44px; }
   .pool-body.drag-over { background: rgba(139,92,246,0.08); }
@@ -165,6 +178,10 @@
   .warn-banner b { color: #fff; }
   body.light .warn-banner { background: rgba(220,38,38,0.10); color: #991b1b; }
   body.light .warn-banner b { color: #7f1d1d; }
+  .info-banner {
+    border: 1px solid var(--accent-2); border-radius: 10px; padding: 10px 14px;
+    margin-bottom: 16px; font-size: 0.82em; line-height: 1.5;
+  }
   .filters { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin-bottom: 18px; }
   .filters .search { flex: 1; min-width: 200px; }
   .toggle-btn.active { background: var(--accent-2); border-color: var(--accent-2); color: #14110b; font-weight: 700; }
@@ -221,7 +238,7 @@
   .field .inline { display: flex; gap: 8px; }
   .field .inline input { flex: 1; }
   .field .inline select { width: auto; }
-  .field .hint { color: var(--muted); font-size: 0.68em; margin-top: 4px; line-height: 1.45; }
+  .hint { color: var(--muted); font-size: 0.68em; margin-top: 4px; line-height: 1.45; }
   .check label { display: flex; gap: 8px; align-items: flex-start; line-height: 1.4; }
   .check input { width: auto !important; margin-top: 2px; }
   .help-box {
@@ -237,6 +254,7 @@
   .tabs button.on, .tabs button.on:hover { color: var(--text); border-bottom-color: var(--accent); }
   .swatches { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 4px; }
   .swatch { width: 26px; height: 26px; border-radius: 7px; cursor: pointer; border: 2px solid transparent; }
+  .field input.hex-input { width: 6.5em; padding: 3px 8px; font-size: 0.75em; height: 26px; }
   .swatch.sel { border-color: #fff; }
   .modal-actions { display: flex; justify-content: space-between; gap: 10px; margin-top: 18px; }
   .modal-actions .right { display: flex; gap: 8px; }
@@ -298,8 +316,14 @@
 <script type="text/babel">
 const { useState, useEffect, useCallback } = React;
 
-const PALETTE = ["#8b5cf6","#f5a142","#22c55e","#06b6d4","#ec4899",
-                 "#eab308","#3b82f6","#ef4444","#14b8a6","#a855f7","#6b7280"];
+// three rows: bright, deep, neutrals/pastels (the original 11 are all in here)
+const PALETTE = [
+  "#ef4444","#f97316","#f5a142","#eab308","#84cc16","#22c55e","#10b981","#14b8a6",
+  "#06b6d4","#0ea5e9","#3b82f6","#6366f1","#8b5cf6","#a855f7","#d946ef","#ec4899",
+  "#b91c1c","#c2410c","#a16207","#4d7c0f","#15803d","#0f766e","#0369a1","#1d4ed8",
+  "#4338ca","#6d28d9","#86198f","#be185d","#f43f5e","#fb7185","#fdba74","#fde047",
+  "#86efac","#67e8f9","#93c5fd","#c4b5fd","#f9a8d4","#78716c","#64748b","#6b7280",
+];
 const SEEN_KEY = "ipam-seen-version";
 
 function hexToRgba(hex, a) {
@@ -333,7 +357,7 @@ function App() {
   const [overPool, setOverPool] = useState(null);
   const [editDevice, setEditDevice] = useState(null);
   const [editPool, setEditPool] = useState(null);
-  const [showSettings, setShowSettings] = useState(false);
+  const [showSettings, setShowSettings] = useState(false);   // false or a tab id
   const [toast, setToast] = useState(null);
   const [newItem, setNewItem] = useState("");
   const [query, setQuery] = useState("");
@@ -524,6 +548,12 @@ function App() {
         </div>
       </header>
 
+      {auth.initial_password && (
+        <div className="info-banner">
+          🔑 You're signed in with the <b>generated admin password</b> from the container log.{" "}
+          <button className="link" onClick={()=>setShowSettings("security")}>Change it now</button>
+        </div>
+      )}
       {state.duplicates && state.duplicates.length > 0 && (
         <div className="warn-banner">
           ⚠ <b>Duplicate IP{state.duplicates.length>1?"s":""} in use:</b>{" "}
@@ -579,6 +609,7 @@ function App() {
         <SettingsModal settings={s} excluded={state.excluded||[]}
           onPreview={setFontPreview}
           onClose={()=>{ setFontPreview(null); setShowSettings(false); }}
+          initialTab={typeof showSettings === "string" ? showSettings : undefined}
           reload={load} flash={flash} />
       )}
       {showLog && ver && (
@@ -828,6 +859,9 @@ function PoolModal({pool, settings, onClose, reload, flash}) {
               className={"swatch-wheel"+(PALETTE.includes(f.color)?"":" sel")}
               value={f.color} onChange={e=>set("color",e.target.value)}
               title="Custom color" />
+            <input className="hex-input" value={f.color} maxLength="7" spellCheck="false"
+              onChange={e=>{ const v = e.target.value.trim(); if (/^#?[0-9a-fA-F]{0,6}$/.test(v)) set("color", v.startsWith("#") ? v : "#" + v); }}
+              title="Hex color" />
           </div></div>
 
         <div className="section-label">Visibility</div>
@@ -912,9 +946,9 @@ function PlatformField({field, value, secretSet, cleared, onChange, onClear}) {
   );
 }
 
-function SettingsModal({settings, excluded, onPreview, onClose, reload, flash}) {
+function SettingsModal({settings, excluded, onPreview, onClose, reload, flash, initialTab}) {
   const platforms = settings.platforms || [];
-  const [tab, setTab] = useState("platform");
+  const [tab, setTab] = useState(initialTab || "platform");
   const [f, setF] = useState({
     platform: settings.platform || "unifi",
     ...(settings.platform_values || {}),
@@ -1068,7 +1102,7 @@ function SettingsModal({settings, excluded, onPreview, onClose, reload, flash}) 
           </div>
         </>}
 
-        {tab === "security" && <SecurityTab />}
+        {tab === "security" && <SecurityTab flash={flash} reload={reload} />}
 
         {tab === "maint" && <>
           <div className="field check"><label>
@@ -1092,50 +1126,254 @@ function SettingsModal({settings, excluded, onPreview, onClose, reload, flash}) 
           </div>
         </>}
 
-        <div className="modal-actions">
-          {tab === "platform" && f.platform !== "none"
-            ? <button onClick={doTest}>Test connection</button> : <span></span>}
-          <div className="right">
-            <button onClick={onClose}>Cancel</button>
-            <button className="primary" onClick={save}>Save</button>
-          </div>
-        </div>
+        {tab === "security"
+          ? <div className="modal-actions"><span></span><button onClick={onClose}>Close</button></div>
+          : <div className="modal-actions">
+              {tab === "platform" && f.platform !== "none"
+                ? <button onClick={doTest}>Test connection</button> : <span></span>}
+              <div className="right">
+                <button onClick={onClose}>Cancel</button>
+                <button className="primary" onClick={save}>Save</button>
+              </div>
+            </div>}
       </div>
     </div>
   );
 }
 
-function SecurityTab() {
+const METHOD_LABELS = {local: "Username + password", oidc: "SSO (OIDC)", token: "Access link / token"};
+
+function ZonePicker({zone, value, onChange, disabled, locked}) {
+  const none = value.includes("none");
+  const toggle = (m) => {
+    if (m === "none") return onChange(none ? [] : ["none"]);
+    const rest = value.filter(x => x !== "none" && x !== m);
+    onChange(value.includes(m) ? rest : [...rest, m]);
+  };
+  return (
+    <div className="field">
+      <label>{zone === "lan" ? "LAN (your network)" : "WAN (internet / through a proxy)"}
+        {locked && <span className="tag env">set by IPAM_AUTH_{zone.toUpperCase()}</span>}</label>
+      <div className="zone-row">
+        <label className="zone-opt"><input type="checkbox" checked={none} disabled={disabled}
+          onChange={()=>toggle("none")} /> No sign-in</label>
+        {["local","oidc","token"].map(m => (
+          <label className="zone-opt" key={m}><input type="checkbox" checked={value.includes(m)}
+            disabled={disabled} onChange={()=>toggle(m)} /> {METHOD_LABELS[m]}</label>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function SecurityTab({flash, reload}) {
   const [r, setR] = useState(null);
-  useEffect(() => { api("/api/auth/status").then(setR); }, []);
-  if (!r) return <div className="hint">Loading…</div>;
-  const pills = (list) => list.length
-    ? list.map(m => <span key={m} className={"pill" + (m !== "none" ? " on" : "")}>{m}</span>)
-    : <span className="pill" style={{color:"var(--danger)"}}>blocked</span>;
-  const o = r.oidc || {};
+  const [f, setF] = useState(null);
+  const [err, setErr] = useState(null);
+  const [newUser, setNewUser] = useState({username: "", password: ""});
+  const [pwFor, setPwFor] = useState(null);
+  const [pw, setPw] = useState("");
+  const [newTok, setNewTok] = useState("");
+  const [created, setCreated] = useState(null);
+  const [oidcTest, setOidcTest] = useState(null);
+  // resetForm: only on first load and after saving the form - user/token
+  // actions refresh the lists without throwing away unsaved form edits
+  const load = async (resetForm) => {
+    const x = await api("/api/auth/status");
+    setR(x);
+    if (resetForm) setF({...x.config, oidc: {...x.config.oidc, client_secret: ""}});
+    if (reload) reload();
+  };
+  useEffect(() => { load(true); }, []);
+  if (!r || !f) return <div className="hint">Loading…</div>;
+
+  const edit = r.can_edit;
+  const locked = (k) => r.locked.includes(k);
+  const dis = (k) => !edit || locked(k);
+  const set = (k, v) => setF(prev => ({...prev, [k]: v}));
+  const setO = (k, v) => setF(prev => ({...prev, oidc: {...prev.oidc, [k]: v}}));
+  const envTag = (k, name) => locked(k) && <span className="tag env">set by {name}</span>;
+  const call = async (method, path, body) => {
+    setErr(null);
+    const res = await api(path, {method, body: body ? JSON.stringify(body) : undefined});
+    if (res && res.error) { setErr(res.error); return null; }
+    return res || {};
+  };
+
+  const save = async (confirmed) => {
+    setErr(null);
+    const res = await api("/api/auth/settings", {method: "PUT",
+      body: JSON.stringify({...f, confirm: !!confirmed})});
+    if (res.confirm) {
+      if (window.confirm(res.confirm + "\n\nSave anyway?")) return save(true);
+      return;
+    }
+    if (res.error) { setErr(res.error); return; }
+    flash("Security settings saved");
+    load(true);
+  };
+  const addUser = async () => {
+    if (await call("POST", "/api/auth/users", newUser)) {
+      setNewUser({username: "", password: ""}); flash("User added"); load();
+    }
+  };
+  const setPassword = async (name) => {
+    if (await call("PUT", `/api/auth/users/${encodeURIComponent(name)}`, {password: pw})) {
+      setPwFor(null); setPw(""); flash(`Password changed for ${name}`); load();
+    }
+  };
+  const delUser = async (name) => {
+    if (!confirm(`Delete user ${name}?`)) return;
+    if (await call("DELETE", `/api/auth/users/${encodeURIComponent(name)}`)) { flash("User deleted"); load(); }
+  };
+  const addToken = async () => {
+    const res = await call("POST", "/api/auth/tokens", {label: newTok});
+    if (res) { setCreated(res); setNewTok(""); load(); }
+  };
+  const delToken = async (label) => {
+    if (!confirm(`Revoke access token "${label}"? Links using it stop working.`)) return;
+    if (await call("DELETE", `/api/auth/tokens/${encodeURIComponent(label)}`)) { flash("Token revoked"); load(); }
+  };
+  const testOidc = async () => {
+    setOidcTest({msg: "Checking…"});
+    const res = await api("/api/auth/oidc/test", {method: "POST", body: JSON.stringify(f.oidc)});
+    setOidcTest(res.ok ? {ok: true, msg: `Found ${res.issuer}${res.pkce ? " (PKCE supported)" : ""}`}
+                       : {ok: false, msg: res.error});
+  };
+  const copy = (t) => { try { navigator.clipboard.writeText(t); flash("Copied"); } catch(e) {} };
+
   return <>
     {(r.warnings||[]).map((w,i)=><div key={i} className="sec-warn">⚠ {w}</div>)}
     <table className="sec-table"><tbody>
       <tr><td>You are connecting from</td><td>{r.client_ip || "?"} → <b>{r.zone.toUpperCase()}</b>
         {r.via_proxy ? ` (via proxy ${r.peer_ip})` : ""}</td></tr>
-      <tr><td>Signed in</td><td>{r.authed_via ? `${r.user || "?"} via ${r.authed_via}` : (r.required ? "no" : "not required here")}</td></tr>
-      <tr><td>LAN sign-in</td><td>{pills(r.lan_methods)}</td></tr>
-      <tr><td>WAN sign-in</td><td>{pills(r.wan_methods)}</td></tr>
-      <tr><td>LAN networks</td><td>{r.lan_networks.join(", ")}</td></tr>
-      <tr><td>Trusted proxies</td><td>{r.trusted_proxies.join(", ")}</td></tr>
-      <tr><td>Local users</td><td>{r.local_users.join(", ") || "—"}</td></tr>
-      <tr><td>Access tokens</td><td>{r.tokens.length ? `${r.tokens.join(", ")} (URL parameter ?${r.token_param}=…)` : "—"}</td></tr>
-      <tr><td>OIDC</td><td>{o.configured
-        ? <>{o.issuer}<br/>client {o.client_id}<br/>redirect URI <code>{o.redirect_uri}</code><br/>
-            button "{o.button_text}"{o.auto_login ? ", auto sign-in on" : ""}
-            {(o.allowed_users.length || o.allowed_groups.length) ?
-              <><br/>allowed: {[...o.allowed_users, ...o.allowed_groups.map(x=>"group:"+x)].join(", ")}</> : null}</>
-        : "not configured"}</td></tr>
+      <tr><td>Signed in</td><td>{r.authed_via ? `${r.user || "?"} via ${r.authed_via}` : "no"}</td></tr>
     </tbody></table>
-    <div className="help-box">
-      Sign-in rules are set with environment variables in your compose file (<code>IPAM_AUTH_LAN</code>,{" "}
-      <code>IPAM_AUTH_WAN</code>, …), not here. That way nobody using the app can switch them off.
-      See the README section “Authentication”.
+
+    {!edit && (
+      <div className="help-box">
+        Only someone signed in with a password or SSO can change these settings.{" "}
+        <a href={"/login?elevate=1&next=" + encodeURIComponent("/")}>Sign in to edit</a>
+      </div>
+    )}
+
+    <div className="section-label">Who needs to sign in</div>
+    <ZonePicker zone="lan" value={f.lan} disabled={dis("lan")} locked={locked("lan")} onChange={v=>set("lan", v)} />
+    <ZonePicker zone="wan" value={f.wan} disabled={dis("wan")} locked={locked("wan")} onChange={v=>set("wan", v)} />
+    <div className="hint" style={{marginTop:"-6px", marginBottom:"10px"}}>
+      Tick several to allow any of them. "No sign-in" can't be combined.
+    </div>
+
+    <details className="sec-more">
+      <summary>Networks &amp; reverse proxy</summary>
+      <div className="field"><label>LAN networks (CIDR, comma-separated) {envTag("lan_networks","IPAM_LAN_NETWORKS")}</label>
+        <textarea rows="2" value={f.lan_networks} disabled={dis("lan_networks")} onChange={e=>set("lan_networks", e.target.value)} /></div>
+      <div className="field"><label>Trusted proxies — allowed to set X-Forwarded-For {envTag("trusted_proxies","IPAM_TRUSTED_PROXIES")}</label>
+        <textarea rows="2" value={f.trusted_proxies} disabled={dis("trusted_proxies")} onChange={e=>set("trusted_proxies", e.target.value)} /></div>
+      <div className="field"><label>Public URL (optional) {envTag("public_url","IPAM_PUBLIC_URL")}</label>
+        <input value={f.public_url} disabled={dis("public_url")} placeholder="https://ipam.example.com"
+          onChange={e=>set("public_url", e.target.value)} />
+        <div className="hint">Only needed if your proxy doesn't send X-Forwarded-Host/Proto. Currently using {r.public_url_effective}.</div></div>
+      <div className="style-grid">
+        <div className="field"><label>Stay signed in (days) {envTag("session_days","IPAM_SESSION_DAYS")}</label>
+          <input type="number" min="1" value={f.session_days} disabled={dis("session_days")} onChange={e=>set("session_days", e.target.value)} /></div>
+        <div className="field check" style={{alignSelf:"end"}}><label>
+          <input type="checkbox" checked={!!f.cookie_secure} disabled={dis("cookie_secure")} onChange={e=>set("cookie_secure", e.target.checked)} />
+          HTTPS-only cookie (only if you never use plain http)</label></div>
+      </div>
+    </details>
+
+    <details className="sec-more" open={f.lan.includes("oidc") || f.wan.includes("oidc") || undefined}>
+      <summary>SSO (OIDC) {r.oidc_ready ? <span className="pill on">configured</span> : null}</summary>
+      <div className="hint" style={{marginBottom:"10px"}}>
+        Register this redirect URI at your provider: <code>{r.oidc_redirect_uri}</code>
+        <button className="link" onClick={()=>copy(r.oidc_redirect_uri)}>copy</button>
+      </div>
+      <div className="field"><label>Issuer URL {envTag("oidc.issuer","IPAM_OIDC_ISSUER")}</label>
+        <input value={f.oidc.issuer} disabled={dis("oidc.issuer")} placeholder="https://auth.example.com/application/o/spazcat-ipam/"
+          onChange={e=>setO("issuer", e.target.value)} /></div>
+      <div className="style-grid">
+        <div className="field"><label>Client ID {envTag("oidc.client_id","IPAM_OIDC_CLIENT_ID")}</label>
+          <input value={f.oidc.client_id} disabled={dis("oidc.client_id")} onChange={e=>setO("client_id", e.target.value)} /></div>
+        <div className="field"><label>Client secret {envTag("oidc.client_secret","IPAM_OIDC_CLIENT_SECRET")}
+          {!locked("oidc.client_secret") && f.oidc.client_secret_set && <span style={{color:"var(--ok)"}}> ✓ saved</span>}</label>
+          <input type="password" value={f.oidc.client_secret} disabled={dis("oidc.client_secret")}
+            placeholder={f.oidc.client_secret_set ? "•••••••• (leave blank to keep)" : ""}
+            onChange={e=>setO("client_secret", e.target.value)} /></div>
+        <div className="field"><label>Login button text {envTag("oidc.button_text","IPAM_OIDC_BUTTON_TEXT")}</label>
+          <input value={f.oidc.button_text} disabled={dis("oidc.button_text")} onChange={e=>setO("button_text", e.target.value)} /></div>
+        <div className="field"><label>Scopes {envTag("oidc.scopes","IPAM_OIDC_SCOPES")}</label>
+          <input value={f.oidc.scopes} disabled={dis("oidc.scopes")} onChange={e=>setO("scopes", e.target.value)} /></div>
+        <div className="field"><label>Allowed users (optional) {envTag("oidc.allowed_users","IPAM_OIDC_ALLOWED_USERS")}</label>
+          <input value={f.oidc.allowed_users} disabled={dis("oidc.allowed_users")} placeholder="sam@example.com"
+            onChange={e=>setO("allowed_users", e.target.value)} /></div>
+        <div className="field"><label>Allowed groups (optional) {envTag("oidc.allowed_groups","IPAM_OIDC_ALLOWED_GROUPS")}</label>
+          <input value={f.oidc.allowed_groups} disabled={dis("oidc.allowed_groups")} placeholder="ipam-admins"
+            onChange={e=>setO("allowed_groups", e.target.value)} /></div>
+      </div>
+      <div className="field check"><label>
+        <input type="checkbox" checked={!!f.oidc.auto_login} disabled={dis("oidc.auto_login")} onChange={e=>setO("auto_login", e.target.checked)} />
+        Skip the login page and go straight to SSO (<code>/login?manual=1</code> still shows it){envTag("oidc.auto_login","IPAM_OIDC_AUTO_LOGIN")}</label></div>
+      <button onClick={testOidc} disabled={!edit}>Test provider</button>
+      {oidcTest && <div className={"test-result " + (oidcTest.ok ? "ok" : "err")}>{oidcTest.msg}</div>}
+    </details>
+
+    {err && <div className="test-result err" style={{marginBottom:"8px"}}>{err}</div>}
+    {edit && <div style={{display:"flex", justifyContent:"flex-end", margin:"4px 0 6px"}}>
+      <button className="primary" onClick={()=>save(false)}>Save security settings</button></div>}
+
+    <div className="section-label">Users (username + password)</div>
+    <div className="excluded-list" style={{maxHeight:"none"}}>
+      {r.users.map(u => (
+        <div className="excluded-row" key={u.name}>
+          <span className="ex-name">{u.name} {u.env && <span className="tag env">from environment</span>}
+            {u.name === r.user && r.authed_via === "local" && <span className="tag">you</span>}</span>
+          {pwFor === u.name
+            ? <><input type="password" className="mini" placeholder="new password (8+)" value={pw}
+                   onChange={e=>setPw(e.target.value)} onKeyDown={e=>{ if (e.key==="Enter") setPassword(u.name); }} autoFocus />
+                <button onClick={()=>setPassword(u.name)}>save</button>
+                <button onClick={()=>{ setPwFor(null); setPw(""); }}>cancel</button></>
+            : <>{edit && !u.env && <button onClick={()=>{ setPwFor(u.name); setPw(""); }}>change password</button>}
+                {edit && !u.env && !(u.name === r.user && r.authed_via === "local") &&
+                  <button className="danger" onClick={()=>delUser(u.name)}>×</button>}</>}
+        </div>
+      ))}
+    </div>
+    {edit && <div className="inline-add">
+      <input className="mini" placeholder="username" value={newUser.username} onChange={e=>setNewUser({...newUser, username: e.target.value})} />
+      <input className="mini" type="password" placeholder="password (8+)" value={newUser.password} onChange={e=>setNewUser({...newUser, password: e.target.value})} />
+      <button onClick={addUser} disabled={!newUser.username || !newUser.password}>+ Add user</button>
+    </div>}
+    <div className="hint">Scripts can also use HTTP Basic auth with these users.</div>
+
+    <div className="section-label">Access tokens</div>
+    {created && (
+      <div className="update-box">
+        <b>Token created. Copy it now; it won't be shown again.</b><br/>
+        Link: <code style={{wordBreak:"break-all"}}>{created.link}</code>
+        <button className="link" onClick={()=>copy(created.link)}>copy link</button><br/>
+        Header: <code>Authorization: Bearer {created.token}</code>
+        <button className="link" onClick={()=>copy(created.token)}>copy token</button>
+      </div>
+    )}
+    <div className="excluded-list" style={{maxHeight:"none"}}>
+      {r.tokens.length === 0 && <div className="excluded-empty">No tokens.</div>}
+      {r.tokens.map(t => (
+        <div className="excluded-row" key={t.label}>
+          <span className="ex-name">{t.label} {t.env && <span className="tag env">from environment</span>}</span>
+          <span className="ex-ip">{t.created ? new Date(t.created*1000).toLocaleDateString() : ""}</span>
+          {edit && !t.env && <button className="danger" onClick={()=>delToken(t.label)}>revoke</button>}
+        </div>
+      ))}
+    </div>
+    {edit && <div className="inline-add">
+      <input className="mini" placeholder="label, e.g. wall-tablet" value={newTok} onChange={e=>setNewTok(e.target.value)} />
+      <button onClick={addToken} disabled={!newTok}>+ Create token</button>
+    </div>}
+
+    <div className="help-box" style={{marginTop:"14px"}}>
+      Locked out? Environment variables override anything set here (see the README), and
+      <code> IPAM_AUTH_RESET=true</code> restores the defaults with a new admin password in the log.
     </div>
   </>;
 }
