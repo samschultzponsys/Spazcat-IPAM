@@ -3,7 +3,8 @@
 Spazcat IPAM - a lightweight IP allocation / device tracking tool.
 
 - Pulls clients from a network controller / router (UniFi, TP-Link Omada,
-  Alta Labs Route10, OpenWrt, MikroTik, OPNsense, Pi-hole - see platforms.py).
+  Alta Labs Route10, OpenWrt, MikroTik, OPNsense, Pi-hole, AdGuard Home,
+  Technitium - see platforms.py).
 - Organizes them into color-coded pools you define in the UI; devices whose IP
   falls inside a pool's subnet can be sorted into it automatically.
 - New/unknown devices with no matching pool land in the gray "Unallocated" pool.

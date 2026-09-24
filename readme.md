@@ -1,10 +1,11 @@
 # Spazcat IPAM
 
 A lightweight, self-hosted IP Address Management tool. Your controller or router
-(UniFi, TP-Link Omada, Alta Labs, OpenWrt, MikroTik, OPNsense, Pi-hole) stays the
-DHCP source of truth. This is the planning and visualization layer on top of it:
-color-coded pools, automatic sorting by subnet, drag-and-drop device assignment,
-duplicate-IP detection, and CSV export so you're never locked to one DHCP server.
+(UniFi, TP-Link Omada, Alta Labs, OpenWrt, MikroTik, OPNsense, Pi-hole, AdGuard Home,
+Technitium) stays the DHCP source of truth. This is the planning and visualization
+layer on top of it: color-coded pools, automatic sorting by subnet, drag-and-drop
+device assignment, duplicate-IP detection, and CSV export so you're never locked to
+one DHCP server.
 
 Stack: Flask + SQLite + React (via CDN, no build step). Single container.
 
@@ -108,6 +109,8 @@ old platform go offline and age out normally. Nothing is deleted.
 | **MikroTik RouterOS 7** | REST API (`/rest/ip/dhcp-server/lease`) | `www-ssl` service enabled and a user (a read-only group is enough). |
 | **OPNsense** | REST API, key + secret | System → Access → Users → API keys. Supports ISC DHCPv4, Kea, and dnsmasq leases. |
 | **Pi-hole v6** | REST API | Only if Pi-hole is your DHCP server. An app password is recommended. |
+| **AdGuard Home** | REST API, basic auth | Uses AdGuard's DHCP leases and static leases when it's your DHCP server. Persistent clients (Settings → Client settings) that list both a MAC and an IP are imported too, with their names, so a DNS-only AdGuard still adds the devices you've named there. Clients identified only by IP are skipped because devices are tracked by MAC. |
+| **Technitium DNS** | REST API, token or user/password | Reads leases from Technitium's DHCP server. Reserved leases show as RES. An API token is recommended (Administration → Sessions → Create Token). |
 | **None** | — | Manual-only IPAM; the Sync button is hidden. |
 
 "Verify TLS" is off by default for self-signed controller certs. Secret fields show

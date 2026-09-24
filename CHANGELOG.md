@@ -9,7 +9,8 @@ GitHub Action publishes the image under — bump it here and nowhere else.
 ### Added
 - **More sync platforms.** A dropdown in Settings → Platform chooses the source: UniFi,
   TP-Link Omada (Open API), Alta Labs Route10 (SSH, experimental), OpenWrt (SSH),
-  MikroTik RouterOS 7, OPNsense, Pi-hole v6, or None (manual only).
+  MikroTik RouterOS 7, OPNsense, Pi-hole v6, AdGuard Home, Technitium DNS, or
+  None (manual only).
 - **Auto-sync in minutes, hours or days.**
 - **Automatic pool sorting.** New devices land directly in the pool whose subnet
   contains their IP (most specific subnet wins). Optionally re-sort every device on

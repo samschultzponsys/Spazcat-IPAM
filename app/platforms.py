@@ -618,6 +618,155 @@ class PiholePlatform(Platform):
         return out
 
 
+# ----------------------------------------------------------------------------
+# AdGuard Home (REST)
+# ----------------------------------------------------------------------------
+
+class AdGuardHomePlatform(Platform):
+    """AdGuard Home: DHCP leases + static leases from /control/dhcp/status,
+    and names from persistent clients (/control/clients). HTTP basic auth.
+    Persistent clients that list both a MAC and an IP are imported too, so a
+    DNS-only AdGuard still contributes the devices you've named there."""
+
+    id = "adguard"
+    label = "AdGuard Home"
+    FIELDS = [
+        F("adguard_host", "AdGuard Home URL", placeholder="http://10.0.1.3:3000"),
+        F("adguard_user", "Username"),
+        F("adguard_password", "Password", "password"),
+        F("adguard_verify_ssl", "Verify TLS certificate", "checkbox", default="0"),
+    ]
+    HELP = ("Uses AdGuard's DHCP leases when it's your DHCP server, plus persistent "
+            "clients (Settings → Client settings) that have both a MAC and an IP.")
+
+    def _get(self, s, host, path):
+        try:
+            r = s.get(f"{host}/control{path}", timeout=15)
+        except requests.RequestException as e:
+            raise PlatformError(f"Connection failed: {e}")
+        if r.status_code in (401, 403):
+            raise PlatformError("Auth rejected - check username / password.")
+        if r.status_code != 200:
+            raise PlatformError(f"AdGuard Home {path} returned HTTP {r.status_code}")
+        try:
+            return r.json()
+        except ValueError:
+            raise PlatformError(f"Unexpected non-JSON response from {path}")
+
+    def get_clients(self):
+        self.require("adguard_host")
+        host = _host_url(self.get("adguard_host"), "http")
+        s = self.session("adguard_verify_ssl")
+        if self.get("adguard_user"):
+            s.auth = (self.get("adguard_user"), self.get("adguard_password"))
+        dhcp = self._get(s, host, "/dhcp/status") or {}
+        clients = (self._get(s, host, "/clients") or {}).get("clients") or []
+        now = int(time.time())
+        out = {}
+        for x in dhcp.get("leases") or []:
+            mac = normalize_mac(x.get("mac"))
+            if mac:
+                out[mac] = _entry(mac, "", x.get("hostname"), x.get("ip"), False, True, now)
+        for x in dhcp.get("static_leases") or []:
+            mac = normalize_mac(x.get("mac"))
+            if not mac:
+                continue
+            e = out.setdefault(mac, _entry(mac, "", x.get("hostname")))
+            e["is_reserved"] = True
+            e["ip"] = x.get("ip") or e["ip"]
+            e["hostname"] = e["hostname"] or x.get("hostname") or ""
+        for c in clients:
+            ids = [str(i).strip() for i in c.get("ids") or []]
+            macs = [normalize_mac(i) for i in ids if len(_MAC_HEX.sub("", i.lower())) == 12 and re.search(r"[:\-.]", i)]
+            ips = [i for i in ids if re.fullmatch(r"\d+\.\d+\.\d+\.\d+", i)]
+            for mac in macs:
+                if mac in out:
+                    out[mac]["name"] = c.get("name") or out[mac]["name"]
+                elif ips:
+                    out[mac] = _entry(mac, c.get("name"), "", ips[0], False, False, 0)
+        return out
+
+
+# ----------------------------------------------------------------------------
+# Technitium DNS Server (REST)
+# ----------------------------------------------------------------------------
+
+class TechnitiumPlatform(Platform):
+    """Technitium DNS Server's built-in DHCP: /api/dhcp/leases/list. Auth with
+    an API token (Administration → Sessions → Create Token) or user/password
+    (logs in, then logs out)."""
+
+    id = "technitium"
+    label = "Technitium DNS"
+    FIELDS = [
+        F("technitium_host", "Technitium URL", placeholder="http://10.0.1.4:5380"),
+        F("technitium_token", "API token", "password",
+          help="Recommended. Or leave blank and use username + password."),
+        F("technitium_user", "Username (if no token)"),
+        F("technitium_password", "Password (if no token)", "password"),
+        F("technitium_verify_ssl", "Verify TLS certificate", "checkbox", default="0"),
+    ]
+    HELP = ("Reads DHCP leases from Technitium's DHCP server. Reserved leases show as "
+            "RES. Create a token under Administration → Sessions → Create Token.")
+
+    def _call(self, s, host, path, params):
+        try:
+            r = s.get(f"{host}/api/{path}", params=params, timeout=15)
+        except requests.RequestException as e:
+            raise PlatformError(f"Connection failed: {e}")
+        if r.status_code != 200:
+            raise PlatformError(f"Technitium {path} returned HTTP {r.status_code}")
+        try:
+            data = r.json()
+        except ValueError:
+            raise PlatformError(f"Unexpected non-JSON response from {path}")
+        if data.get("status") != "ok":
+            raise PlatformError(f"Technitium: {data.get('errorMessage') or data.get('status')}")
+        return data.get("response") or data
+
+    @staticmethod
+    def _ts(v):
+        for fmt in ("%m/%d/%Y %H:%M:%S", "%Y-%m-%dT%H:%M:%S"):
+            try:
+                return int(time.mktime(time.strptime(str(v or "")[:19], fmt)))
+            except ValueError:
+                continue
+        return 0
+
+    def get_clients(self):
+        self.require("technitium_host")
+        host = _host_url(self.get("technitium_host"), "http")
+        s = self.session("technitium_verify_ssl")
+        token, login = self.get("technitium_token").strip(), False
+        if not token:
+            self.require("technitium_user")
+            token = self._call(s, host, "user/login", {
+                "user": self.get("technitium_user"), "pass": self.get("technitium_password")}).get("token")
+            if not token:
+                raise PlatformError("Technitium login returned no token.")
+            login = True
+        try:
+            s.headers["Authorization"] = f"Bearer {token}"
+            leases = self._call(s, host, "dhcp/leases/list", {"token": token}).get("leases") or []
+        finally:
+            if login:
+                try:
+                    s.get(f"{host}/api/user/logout", params={"token": token}, timeout=5)
+                except requests.RequestException:
+                    pass
+        now = int(time.time())
+        out = {}
+        for x in leases:
+            mac = normalize_mac(x.get("hardwareAddress"))
+            if not mac:
+                continue
+            online = self._ts(x.get("leaseExpires")) > now
+            out[mac] = _entry(mac, "", (x.get("hostName") or "").rstrip("."),
+                              x.get("address"), x.get("type") == "Reserved",
+                              online, now if online else 0)
+        return out
+
+
 class ManualPlatform(Platform):
     id = "none"
     label = "None (manual only)"
@@ -630,7 +779,8 @@ class ManualPlatform(Platform):
 
 PLATFORMS = {p.id: p for p in (
     UniFiPlatform, OmadaPlatform, AltaRoute10Platform, OpenWrtSSHPlatform,
-    MikroTikPlatform, OPNsensePlatform, PiholePlatform, ManualPlatform,
+    MikroTikPlatform, OPNsensePlatform, PiholePlatform, AdGuardHomePlatform,
+    TechnitiumPlatform, ManualPlatform,
 )}
 
 
