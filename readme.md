@@ -134,6 +134,9 @@ return `{mac: {ip, name, hostname, online, is_reserved, last_seen}}` from
 
 Each pool's **edit** dialog has a live preview of its header, plus:
 
+- **Color**: 40 presets across bright, deep and pastel shades, a color wheel, or
+  type any hex value.
+
 - **Hide this pool while it has no devices.** A hidden pool shows again as soon as
   anything is in it. That includes Unallocated, which reappears the moment a device
   lands there. It also shows while you drag a device, so it still works as a drop
@@ -213,114 +216,131 @@ the controller can't be reached, the app waits one full interval before retrying
 
 ## Authentication
 
-Sign-in is set **per network zone** with environment variables in `compose.yaml`.
-It's deliberately not in the Settings screen: otherwise anyone on a zone with no
-sign-in could switch it off for the internet side too.
+### First start
 
-- **LAN** means the client IP is inside `IPAM_LAN_NETWORKS` (default: private
-  ranges `10/8`, `172.16/12`, `192.168/16`, loopback, link-local, IPv6 ULA).
-  **WAN** is everything else.
-- Each zone gets a comma-separated list of methods. **Any one** of them signs you
-  in. `none` can't be combined with anything.
+Sign-in is **on by default**. The first time the container starts, it creates the
+user `admin` with a random password and prints it in a box in the log:
 
-| method | what it is |
+```bash
+docker logs spazcat-ipam 2>&1 | grep -A4 "ADMIN SIGN-IN"
+```
+```
+  ╔══════════════════════════════════════════════════════╗
+  ║            SPAZCAT IPAM  -  ADMIN SIGN-IN            ║
+  ╠══════════════════════════════════════════════════════╣
+  ║     username :  admin                                ║
+  ║     password :  Nx7e-zfgu-Dejp-P9Fk                  ║
+  ...
+```
+
+Sign in, then change the password in **Settings → Security**. A banner in the app
+reminds you. Until you change it, the box is printed on every start, so you can
+still find it after the container is recreated.
+
+### Settings → Security
+
+Everything is configured in the app:
+
+- **Who needs to sign in**, separately for **LAN** (client IP inside your LAN
+  networks; default: the private ranges) and **WAN** (everything else). Tick any
+  combination of *Username + password*, *SSO (OIDC)* and *Access link / token*, and
+  **any one** of them signs you in. *No sign-in* can't be combined with others.
+- **Users.** Add users, change passwords, delete users. Scripts can use HTTP Basic
+  auth with these users.
+- **Access tokens.** Create one with a label and you get a ready-made link
+  (`https://ipam.example.com/?token=…`) plus the header form
+  (`Authorization: Bearer …`). The token is shown **once** and stored hashed.
+  Opening the link signs the browser in and removes the token from the address bar.
+  Revoke a token any time.
+- **SSO (OIDC).** Issuer, client ID and secret, login button text, optional
+  auto sign-in, and allowed users or groups. **Test provider** checks the discovery
+  document, and the tab shows the redirect URI to register at your provider.
+- **Networks & reverse proxy.** LAN networks, trusted proxies, public URL, session
+  length and HTTPS-only cookie.
+- The top of the tab shows the IP and zone the app sees for you, with warnings for
+  risky setups.
+
+Safety rails:
+- **Only someone signed in with a password or SSO can change these settings**, not
+  a visitor on a *No sign-in* network and not a token session. On an open LAN, the
+  tab has a **Sign in to edit** link.
+- A save that would lock *you* out, such as dropping the method you're signed in
+  with on the network you're on, needs an explicit confirmation. A method that isn't
+  set up yet (for example SSO with no issuer) can't be enabled.
+- You can't delete your own user, the last user while password sign-in is on, or
+  the last token while access links are on.
+- A session only counts in a zone that allows the method it was created with. For
+  example, a password login made at home doesn't carry over to a WAN that is set to
+  SSO only.
+
+Examples of common setups:
+
+| LAN | WAN | use |
+|---|---|---|
+| No sign-in | SSO + password | open at home, SSO (or password fallback) from outside |
+| Password | SSO, with auto sign-in | always sign in; from outside go straight to Authentik |
+| No sign-in | Access link | a wall tablet with a bookmarked link |
+
+### Environment overrides & recovery
+
+Every setting can also be set with an environment variable in `compose.yaml`.
+**An environment variable wins over the UI**, and the field shows as locked in
+Settings → Security. Use these for infrastructure-as-code, or to get back in when
+the UI config is broken.
+
+| var | overrides |
 |---|---|
-| `none` | no sign-in |
-| `local` | username + password form |
-| `oidc` | single sign-on through Authentik, Authelia, Keycloak, Pocket ID, Google, … |
-| `token` | an access link `https://ipam.example.com/?token=SECRET` (signs the browser in, then removes the token from the address bar), or `Authorization: Bearer SECRET` / `X-IPAM-Token: SECRET` for scripts |
+| `IPAM_AUTH_LAN` / `IPAM_AUTH_WAN` | methods, e.g. `none` or `local,oidc` (`none`, `local`, `oidc`, `token`) |
+| `IPAM_AUTH_USER` + `IPAM_AUTH_PASSWORD` or `IPAM_AUTH_PASSWORD_HASH` | adds or overrides one user (default name `admin`) while set |
+| `IPAM_AUTH_USERS` | more users: `alice:<hash-or-password>,bob:<...>` |
+| `IPAM_AUTH_TOKENS` | extra tokens: `label:SECRET,...`; `IPAM_AUTH_TOKEN_PARAM` renames `?token=` |
+| `IPAM_LAN_NETWORKS`, `IPAM_TRUSTED_PROXIES`, `IPAM_PUBLIC_URL` | networks / proxy |
+| `IPAM_OIDC_ISSUER`, `IPAM_OIDC_DISCOVERY_URL`, `IPAM_OIDC_CLIENT_ID`, `IPAM_OIDC_CLIENT_SECRET`, `IPAM_OIDC_SCOPES`, `IPAM_OIDC_REDIRECT_URI`, `IPAM_OIDC_AUTO_LOGIN`, `IPAM_OIDC_BUTTON_TEXT`, `IPAM_OIDC_ALLOWED_USERS`, `IPAM_OIDC_ALLOWED_GROUPS`, `IPAM_OIDC_GROUPS_CLAIM` | SSO |
+| `IPAM_SESSION_DAYS`, `IPAM_COOKIE_SECURE` | sessions |
+| `IPAM_AUTH_ENABLED=true` | legacy: password sign-in on both zones |
+| `IPAM_AUTH_RESET=true` | **resets** Settings → Security to the defaults and prints a new admin password. Remove it after one start. |
 
-Examples:
+Locked out? Either:
+- add `IPAM_AUTH_USER: "rescue"` and `IPAM_AUTH_PASSWORD: "something-long"`, sign in
+  with that and fix the settings, then remove the two variables; or
+- set `IPAM_AUTH_RESET: "true"`, restart, get the new admin password from the log,
+  then remove the variable.
 
-```yaml
-IPAM_AUTH_LAN: "none"             # open at home...
-IPAM_AUTH_WAN: "oidc,local"       # ...SSO or password from outside
-```
-```yaml
-IPAM_AUTH_LAN: "local"
-IPAM_AUTH_WAN: "oidc"             # outside: SSO only
-IPAM_OIDC_AUTO_LOGIN: "true"      # and skip the login page entirely
-```
-```yaml
-IPAM_AUTH_LAN: "none"
-IPAM_AUTH_WAN: "token"            # e.g. a wall tablet with a bookmarked access link
-```
-
-A session only counts in a zone that allows the method it was created with. For
-example, a password login made at home doesn't carry over to a WAN that is set to
-SSO only.
-
-**Defaults and safety:**
-- With no `IPAM_AUTH_*` set, both zones are `none`, as in earlier versions.
-- `IPAM_AUTH_ENABLED=true` still works and means `local` on both zones.
-- A method you enable but don't configure (say `oidc` with no issuer) is dropped
-  with an error in the log. If that leaves a zone with nothing usable, that zone is
-  **blocked**, not opened.
-- **Settings → Security** shows the IP and zone the app sees for you and the active
-  rules, with warnings for risky setups.
-
-### Local users
-
-| var | purpose |
-|---|---|
-| `IPAM_AUTH_USER` + `IPAM_AUTH_PASSWORD_HASH` | one user (default name `admin`); `IPAM_AUTH_PASSWORD` takes plaintext instead |
-| `IPAM_AUTH_USERS` | more users: `alice:<hash>,bob:<hash>` |
-
-Generate a hash with the image itself, so you don't need Python on the host:
+A password hash for the environment can be made with the image itself:
 
 ```bash
 docker run --rm ghcr.io/samschultzponsys/spazcat-ipam python -c \
   "from werkzeug.security import generate_password_hash as g; print(g('yourpassword'))"
 ```
 
-In compose YAML, write each `$` in the hash as `$$`.
+In compose YAML, write each `$` in the hash as `$$`. Failed password and token
+attempts are rate limited: 10 per 15 minutes per client IP.
 
-Failed password and token attempts are rate limited: 10 per 15 minutes per
-client IP.
+### OIDC setup
 
-### Access tokens
-
-`IPAM_AUTH_TOKENS: "phone:SECRET1,wallpanel:SECRET2"`. The label is optional and
-shows in Settings → Security, never the secret. Generate one with
-`openssl rand -hex 24`. `IPAM_AUTH_TOKEN_PARAM` renames the `?token=` parameter.
-Tokens can end up in proxy logs and browser history, so use them for convenience
-devices and prefer OIDC or local for people.
-
-### OIDC
-
-1. At your provider, create an OAuth2/OIDC app ("confidential" client) with the
-   redirect URI **`https://<your ipam url>/auth/oidc/callback`**. Settings →
-   Security shows the exact URI the app will send.
-2. Set:
-
-| var | purpose |
-|---|---|
-| `IPAM_OIDC_ISSUER` | issuer URL (discovery is read from `/.well-known/openid-configuration`); or set `IPAM_OIDC_DISCOVERY_URL` directly |
-| `IPAM_OIDC_CLIENT_ID` / `IPAM_OIDC_CLIENT_SECRET` | client credentials |
-| `IPAM_OIDC_SCOPES` | default `openid profile email` (add `groups` if your provider needs it) |
-| `IPAM_OIDC_BUTTON_TEXT` | login page button, default "Sign in with SSO" |
-| `IPAM_OIDC_AUTO_LOGIN` | `true` = go straight to the provider instead of showing the login page |
-| `IPAM_OIDC_ALLOWED_USERS` | optional: emails / usernames / subject IDs allowed in |
-| `IPAM_OIDC_ALLOWED_GROUPS` | optional: groups allowed in (claim name via `IPAM_OIDC_GROUPS_CLAIM`, default `groups`) |
-| `IPAM_OIDC_REDIRECT_URI` | override the computed redirect URI |
+1. At your provider (Authentik, Authelia, Keycloak, Pocket ID, Google, …), create an
+   OAuth2/OIDC "confidential" client. Use the redirect URI shown in Settings →
+   Security, which is `https://<your ipam url>/auth/oidc/callback`.
+2. In Settings → Security → SSO, enter the issuer URL, client ID and secret, click
+   **Test provider**, then **Save security settings**.
+3. Tick *SSO (OIDC)* for WAN and/or LAN, then save again.
 
 The flow uses PKCE and validates the ID token's signature, issuer, audience and
-nonce. With auto sign-in on, `/login?manual=1` still shows the login page (for
-example, to use a password instead). Signing out lands there too, so you don't
-bounce straight back into SSO.
+nonce. With auto sign-in on, `/login?manual=1` still shows the login page, and
+signing out lands there too, so you don't bounce straight back into SSO.
 
 ### Behind a reverse proxy (Nginx Proxy Manager, Traefik, Caddy…)
 
 1. Proxy `https://ipam.example.com` → `http://<docker host>:20080` (websockets not
    needed). NPM: add a Proxy Host, scheme `http`, port `20080`, then request an SSL
    certificate and turn on *Force SSL*.
-2. The app trusts `X-Forwarded-For` / `-Proto` / `-Host` **only** from
-   `IPAM_TRUSTED_PROXIES` (default: private ranges and loopback, which covers NPM on
+2. The app trusts `X-Forwarded-For` / `-Proto` / `-Host` **only** from the
+   trusted proxies (default: private ranges and loopback, which covers NPM on
    the same host or LAN). It reads the header right to left, so a client can't
    inject a fake LAN address.
-3. Set `IPAM_PUBLIC_URL=https://ipam.example.com` if the proxy doesn't send
+3. Set the public URL in Settings → Security if the proxy doesn't send
    `X-Forwarded-Host` / `-Proto`. This matters for the OIDC redirect URI.
-4. If you only ever reach the app over HTTPS, set `IPAM_COOKIE_SECURE=true`.
+4. If you only ever reach the app over HTTPS, tick *HTTPS-only cookie*.
 5. Open Settings → Security from outside (for example, on your phone with Wi-Fi
    off) and check that it shows your public IP and **WAN**.
 
@@ -330,14 +350,11 @@ which would count as LAN. The Security tab warns when it sees this.
 
 ### Sessions
 
-| var | purpose |
-|---|---|
-| `IPAM_SESSION_DAYS` | sign-in lifetime, default 30 |
-| `IPAM_COOKIE_SECURE` | `true` = cookie only sent over HTTPS |
-| `IPAM_SECRET_KEY` | optional; otherwise a stable secret is generated and stored in the DB |
-
-Sessions are signed, HttpOnly, SameSite=Lax cookies. Before sign-in, only the
-login page, the app name, the logo font, the font files and `/healthz` are reachable.
+Sessions are signed, HttpOnly, SameSite=Lax cookies. Their length and the
+HTTPS-only flag are set in Settings → Security. `IPAM_SECRET_KEY` optionally sets
+the signing secret; otherwise a stable one is generated and stored in the DB.
+Before sign-in, only the login page, the app name, the logo font, the font files
+and `/healthz` are reachable.
 
 ## Other environment variables
 

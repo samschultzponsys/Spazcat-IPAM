@@ -110,14 +110,11 @@ def version_key(v):
 # Sessions + auth (see auth.py for the LAN/WAN method rules)
 # ----------------------------------------------------------------------------
 #   IPAM_SECRET_KEY          session-signing secret (else persisted in DB)
-#   IPAM_SESSION_DAYS        session lifetime in days (default 30)
-#   IPAM_COOKIE_SECURE       "true" to mark the cookie Secure (HTTPS-only access)
+#   Session length / Secure cookie are Security settings (auth.py applies them).
 def _env_bool(name, default=""):
     return os.environ.get(name, default).lower() in ("1", "true", "yes", "on")
 
 
-SESSION_DAYS = int(os.environ.get("IPAM_SESSION_DAYS", "30") or 30)
-COOKIE_SECURE = _env_bool("IPAM_COOKIE_SECURE")
 
 # Update check: which image to look at, and a hard off-switch
 UPDATE_IMAGE = os.environ.get("IPAM_UPDATE_IMAGE", "ghcr.io/samschultzponsys/spazcat-ipam").strip()
@@ -130,8 +127,8 @@ app.config.update(
     # Lax (not Strict) so the session survives the top-level redirect back
     # from the OIDC provider
     SESSION_COOKIE_SAMESITE="Lax",
-    SESSION_COOKIE_SECURE=COOKIE_SECURE,
-    PERMANENT_SESSION_LIFETIME=timedelta(days=SESSION_DAYS),
+    SESSION_COOKIE_SECURE=False,
+    PERMANENT_SESSION_LIFETIME=timedelta(days=30),
 )
 # fallback secret so sessions never crash before configure_secret() runs
 app.secret_key = secrets.token_hex(32)
@@ -322,6 +319,8 @@ def init_db():
             db.execute("INSERT OR IGNORE INTO settings (key, value) VALUES (?,?)", (k, v))
         set_setting(db, "app_version", VERSION)
         db.commit()
+    # security settings live in the same DB; creates the admin user on first run
+    auth.bootstrap(DB_PATH)
 
 
 def get_setting(db, key, default=None):
@@ -861,10 +860,6 @@ def healthz():
     """For Docker HEALTHCHECK / proxy health checks. Public, no data."""
     return jsonify({"ok": True, "version": VERSION})
 
-
-@app.route("/api/auth/status")
-def api_auth_status():
-    return jsonify(auth.security_report())
 
 
 @app.route("/api/branding")

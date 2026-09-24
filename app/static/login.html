@@ -96,7 +96,14 @@
                         "Check the server log / IPAM_AUTH_* settings.";
       return;
     }
-    if (c.methods && c.methods.length === 1 && c.methods[0] === "none") { location = next; return; }
+    const elevate = params.get("elevate");
+    if (c.open && !elevate) { location = next; return; }
+    if (c.open && elevate) {
+      $("tokenNote").textContent = "This network doesn't require sign-in. Sign in to change security settings.";
+      $("tokenNote").classList.remove("hide");
+      if (!c.local && !c.oidc) $("tokenNote").textContent =
+        "There's no password user or SSO set up to sign in with.";
+    }
     if (c.local) $("local").classList.remove("hide");
     if (c.oidc) {
       $("sso").textContent = c.oidc_button || "Sign in with SSO";
@@ -104,7 +111,7 @@
       if (c.local) $("or").classList.remove("hide");
       else $("sso").style.marginTop = "0";
     }
-    if (c.token) {
+    if (c.token && !c.open) {
       $("tokenNote").classList.remove("hide");
       if (!c.local && !c.oidc) $("tokenNote").textContent =
         "This instance is opened with an access link. Use the link you were given.";

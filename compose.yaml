@@ -18,44 +18,19 @@ services:
       IPAM_DB: /data/ipam.db
 
       # ---------------------------------------------------------------------
-      # Sign-in - see README "Authentication". Methods per zone, comma-separated:
-      #   none | local | oidc | token     (any one enabled method signs you in;
-      #                                    "none" can't be combined)
-      # LAN = client IP in IPAM_LAN_NETWORKS (default: private ranges), WAN = rest.
-      # With no IPAM_AUTH_* set, the app is open everywhere - fine on a LAN,
-      # NOT fine once a reverse proxy exposes it to the internet.
+      # Sign-in is set up in the app: Settings -> Security. On first start the
+      # log shows the admin password:  docker logs spazcat-ipam
+      #
+      # Everything below is OPTIONAL. An environment variable overrides (and
+      # locks) the matching UI setting - handy for recovery. See README
+      # "Environment overrides & recovery" for the full list.
       # ---------------------------------------------------------------------
-      # IPAM_AUTH_LAN: "none"
+      # IPAM_AUTH_RESET: "true"                  # reset Security settings once, then remove
+      # IPAM_AUTH_USER: "rescue"                 # emergency user while locked out...
+      # IPAM_AUTH_PASSWORD: "something-long"     # ...remove both afterwards
+      # IPAM_AUTH_LAN: "none"                    # force methods: none|local|oidc|token
       # IPAM_AUTH_WAN: "oidc,local"
-
-      # Behind Nginx Proxy Manager / Traefik / Caddy: the proxy's address must be
-      # in IPAM_TRUSTED_PROXIES (default already covers private ranges) so the
-      # real client IP is read from X-Forwarded-For.
       # IPAM_TRUSTED_PROXIES: "172.16.0.0/12,10.0.0.0/8,192.168.0.0/16,127.0.0.1/32"
-      # IPAM_LAN_NETWORKS: "192.168.1.0/24,10.0.0.0/8"
-      # IPAM_PUBLIC_URL: "https://ipam.example.com"
-      # IPAM_COOKIE_SECURE: "true"               # only if you ALWAYS use https
-
-      # --- local (username + password) ---
-      # IPAM_AUTH_USER: "sam"
-      # IPAM_AUTH_PASSWORD_HASH: "scrypt:32768:8:1$..."   # or IPAM_AUTH_PASSWORD
-      # IPAM_AUTH_USERS: "alice:scrypt:32768:8:1$...,bob:scrypt:..."
-
-      # --- token (access link https://ipam.example.com/?token=SECRET, or
-      #     "Authorization: Bearer SECRET" for scripts). openssl rand -hex 24 ---
-      # IPAM_AUTH_TOKENS: "phone:SECRET1,wallpanel:SECRET2"
-
-      # --- OIDC (Authentik, Authelia, Keycloak, Pocket ID, Google, ...) ---
-      # Redirect URI to register at the provider: <your URL>/auth/oidc/callback
-      # IPAM_OIDC_ISSUER: "https://auth.example.com/application/o/spazcat-ipam/"
-      # IPAM_OIDC_CLIENT_ID: "spazcat-ipam"
-      # IPAM_OIDC_CLIENT_SECRET: "..."
-      # IPAM_OIDC_BUTTON_TEXT: "Sign in with Authentik"
-      # IPAM_OIDC_AUTO_LOGIN: "true"             # skip the login page, go straight to SSO
-      # IPAM_OIDC_ALLOWED_GROUPS: "ipam-admins"  # optional
-      # IPAM_OIDC_ALLOWED_USERS: "sam@example.com"
-
-      # IPAM_SESSION_DAYS: "30"
 
       # --- Update check (on by default; reads this image's tag list on ghcr.io) ---
       # IPAM_UPDATE_CHECK: "false"
