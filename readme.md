@@ -36,7 +36,7 @@ container, copy a backup over `data/ipam.db`, and run the older image tag.
 - `ghcr.io`, every 6 hours, to read this image's tag list for the update dot. You
   can turn this off in Settings → Maintenance, or hard-disable it with
   `IPAM_UPDATE_CHECK=false`;
-- PyPI at container start, and only with the manual (runtime-pip) compose.
+- your OIDC provider, if you use SSO sign-in.
 
 There is no telemetry and no analytics. The browser loads React and Babel from
 unpkg. Credentials are stored server-side and never sent to the browser: secret
@@ -51,48 +51,39 @@ leaves your box. Keep `data/` off any shared or synced location.
 ```
 .
 ├── CHANGELOG.md            # release notes + THE version number (newest "## x.y")
-├── Dockerfile              # builds the image (COPY app/… + CHANGELOG.md)
-├── compose.yaml            # image deploy: runs the prebuilt GHCR image
-├── compose.manual.yaml     # manual deploy: runtime-pip, bind-mounts ./app
+├── Dockerfile              # image recipe, built by the Action (not locally)
+├── compose.yaml            # deploy: runs the prebuilt GHCR image
 ├── .github/workflows/      # Action that builds + pushes to GHCR, tagged x.y
 ├── .gitignore              # excludes data/, *.db
 └── app/
     ├── app.py              # Flask app: API, sync, pools, fonts, version
+    ├── auth.py             # sign-in: LAN/WAN zones, local, OIDC, tokens
     ├── platforms.py        # one class per sync platform
     ├── requirements.txt
     └── static/             # index.html, login.html, favicon.svg
         └── fonts/          # ← upload font files here (baked into the image)
 ```
-All deploy methods run from this one tree, so GitHub stays the single source of
-truth.
+GitHub is the single source of truth: every push to `main` builds and publishes
+the image, and that image is the only supported way to run the app.
 
 ## Deploy
 
-Clone the repo onto the host, then pick a method (all serve on port 20080).
-Carrying over an existing instance: copy your existing `ipam.db` into `./data/`
-before first start (it's gitignored, so it never came from the repo).
+Spazcat IPAM ships as a prebuilt container image
+(`ghcr.io/samschultzponsys/spazcat-ipam`, amd64 + arm64). Grab
+[`compose.yaml`](compose.yaml), put it in a folder on the host, and:
 
-**A. Docker image (from GHCR)**, recommended:
 ```bash
-docker compose up -d                      # uses compose.yaml
+docker compose up -d          # serves on port 20080
 ```
+
 To update: `docker compose pull && docker compose up -d`. Your `data/` folder is
-reused and backed up automatically. You can also pin a version tag (`:1.1`)
-instead of `:latest`.
+reused and backed up automatically. You can pin a version tag (`:1.2`) instead of
+`:latest`. To carry over an existing instance, copy its `ipam.db` into `./data/`
+before first start.
 
-**B. Manual (no image build)**. Edits take effect on restart:
-```bash
-docker compose -f compose.manual.yaml up -d
-```
-Uses the stock python image, installs deps at start, and bind-mounts `./app`.
-To update: `git pull && docker compose -f compose.manual.yaml restart`.
-
-**C. Bare metal (no Docker at all)**:
-```bash
-cd app
-pip install -r requirements.txt
-IPAM_DB=./data/ipam.db python app.py
-```
+The container has a health check (`/healthz`) and runs on the Waitress production
+web server. There's no local-build or bare-metal path. Changes go through GitHub,
+and the Action builds the image.
 
 ## Sync platforms
 
@@ -138,6 +129,25 @@ return `{mac: {ip, name, hostname, online, is_reserved, last_seen}}` from
 - Sorting never moves locked devices, devices with no matching pool, or stale
   devices (offline past the grace period and not reserved). Stale devices stay in
   Unallocated, so the grace-period fallback and auto-sort don't fight.
+
+## Pool settings
+
+Each pool's **edit** dialog has a live preview of its header, plus:
+
+- **Hide this pool while it has no devices.** A hidden pool shows again as soon as
+  anything is in it. That includes Unallocated, which reappears the moment a device
+  lands there. It also shows while you drag a device, so it still works as a drop
+  target. A "N empty pools hidden — show" link under the search bar reveals hidden
+  pools so you can edit them.
+- **Header style:**
+  - font (any installed font, or the global header font from Appearance)
+  - size, bold, italic, UPPERCASE and letter spacing
+  - name color and header tint strength
+  - whether the color dot, subnets, notes and device count show
+
+  *Reset style* returns the header to the defaults.
+- The **▼ caret** on each header collapses the pool. This is remembered per
+  browser, and a collapsed pool still accepts dropped devices.
 
 ## Duplicate IPs & stale data
 
@@ -201,31 +211,133 @@ the controller can't be reached, the app waits one full interval before retrying
 **Cutting a release:** add a new `## x.y — YYYY-MM-DD` section at the top of
 `CHANGELOG.md` with the notes, and push to `main`.
 
-## Authentication (optional, for WAN exposure)
+## Authentication
 
-Off by default. Enable it with environment variables (see `compose.yaml`):
+Sign-in is set **per network zone** with environment variables in `compose.yaml`.
+It's deliberately not in the Settings screen: otherwise anyone on a zone with no
+sign-in could switch it off for the internet side too.
 
-| var | purpose |
-|-----|---------|
-| `IPAM_AUTH_ENABLED` | `true` to require login |
-| `IPAM_AUTH_USER` | username (default `admin`) |
-| `IPAM_AUTH_PASSWORD` | plaintext password, hashed (scrypt) in memory at boot |
-| `IPAM_AUTH_PASSWORD_HASH` | pre-hashed password; wins if set, keeps plaintext out of compose |
-| `IPAM_SESSION_DAYS` | login lifetime, default 30 |
-| `IPAM_COOKIE_SECURE` | `true` when served over HTTPS |
-| `IPAM_SECRET_KEY` | optional; else a stable secret is generated and stored in the DB |
+- **LAN** means the client IP is inside `IPAM_LAN_NETWORKS` (default: private
+  ranges `10/8`, `172.16/12`, `192.168/16`, loopback, link-local, IPv6 ULA).
+  **WAN** is everything else.
+- Each zone gets a comma-separated list of methods. **Any one** of them signs you
+  in. `none` can't be combined with anything.
 
-Generate a password hash (so no plaintext lives in your compose):
+| method | what it is |
+|---|---|
+| `none` | no sign-in |
+| `local` | username + password form |
+| `oidc` | single sign-on through Authentik, Authelia, Keycloak, Pocket ID, Google, … |
+| `token` | an access link `https://ipam.example.com/?token=SECRET` (signs the browser in, then removes the token from the address bar), or `Authorization: Bearer SECRET` / `X-IPAM-Token: SECRET` for scripts |
 
-```bash
-python -c "from werkzeug.security import generate_password_hash as g; print(g('yourpassword'))"
+Examples:
+
+```yaml
+IPAM_AUTH_LAN: "none"             # open at home...
+IPAM_AUTH_WAN: "oidc,local"       # ...SSO or password from outside
+```
+```yaml
+IPAM_AUTH_LAN: "local"
+IPAM_AUTH_WAN: "oidc"             # outside: SSO only
+IPAM_OIDC_AUTO_LOGIN: "true"      # and skip the login page entirely
+```
+```yaml
+IPAM_AUTH_LAN: "none"
+IPAM_AUTH_WAN: "token"            # e.g. a wall tablet with a bookmarked access link
 ```
 
-Passwords are verified with a KDF (scrypt) and never stored in plaintext.
-Sessions are signed, HttpOnly cookies. If auth is enabled but no password is
-provided, the app logs a warning and stays open, so you can't lock yourself out.
-Set a password to actually protect it. The login page shows your app name and
-logo font. Only the app name, logo font and font files are visible before login.
+A session only counts in a zone that allows the method it was created with. For
+example, a password login made at home doesn't carry over to a WAN that is set to
+SSO only.
+
+**Defaults and safety:**
+- With no `IPAM_AUTH_*` set, both zones are `none`, as in earlier versions.
+- `IPAM_AUTH_ENABLED=true` still works and means `local` on both zones.
+- A method you enable but don't configure (say `oidc` with no issuer) is dropped
+  with an error in the log. If that leaves a zone with nothing usable, that zone is
+  **blocked**, not opened.
+- **Settings → Security** shows the IP and zone the app sees for you and the active
+  rules, with warnings for risky setups.
+
+### Local users
+
+| var | purpose |
+|---|---|
+| `IPAM_AUTH_USER` + `IPAM_AUTH_PASSWORD_HASH` | one user (default name `admin`); `IPAM_AUTH_PASSWORD` takes plaintext instead |
+| `IPAM_AUTH_USERS` | more users: `alice:<hash>,bob:<hash>` |
+
+Generate a hash with the image itself, so you don't need Python on the host:
+
+```bash
+docker run --rm ghcr.io/samschultzponsys/spazcat-ipam python -c \
+  "from werkzeug.security import generate_password_hash as g; print(g('yourpassword'))"
+```
+
+In compose YAML, write each `$` in the hash as `$$`.
+
+Failed password and token attempts are rate limited: 10 per 15 minutes per
+client IP.
+
+### Access tokens
+
+`IPAM_AUTH_TOKENS: "phone:SECRET1,wallpanel:SECRET2"`. The label is optional and
+shows in Settings → Security, never the secret. Generate one with
+`openssl rand -hex 24`. `IPAM_AUTH_TOKEN_PARAM` renames the `?token=` parameter.
+Tokens can end up in proxy logs and browser history, so use them for convenience
+devices and prefer OIDC or local for people.
+
+### OIDC
+
+1. At your provider, create an OAuth2/OIDC app ("confidential" client) with the
+   redirect URI **`https://<your ipam url>/auth/oidc/callback`**. Settings →
+   Security shows the exact URI the app will send.
+2. Set:
+
+| var | purpose |
+|---|---|
+| `IPAM_OIDC_ISSUER` | issuer URL (discovery is read from `/.well-known/openid-configuration`); or set `IPAM_OIDC_DISCOVERY_URL` directly |
+| `IPAM_OIDC_CLIENT_ID` / `IPAM_OIDC_CLIENT_SECRET` | client credentials |
+| `IPAM_OIDC_SCOPES` | default `openid profile email` (add `groups` if your provider needs it) |
+| `IPAM_OIDC_BUTTON_TEXT` | login page button, default "Sign in with SSO" |
+| `IPAM_OIDC_AUTO_LOGIN` | `true` = go straight to the provider instead of showing the login page |
+| `IPAM_OIDC_ALLOWED_USERS` | optional: emails / usernames / subject IDs allowed in |
+| `IPAM_OIDC_ALLOWED_GROUPS` | optional: groups allowed in (claim name via `IPAM_OIDC_GROUPS_CLAIM`, default `groups`) |
+| `IPAM_OIDC_REDIRECT_URI` | override the computed redirect URI |
+
+The flow uses PKCE and validates the ID token's signature, issuer, audience and
+nonce. With auto sign-in on, `/login?manual=1` still shows the login page (for
+example, to use a password instead). Signing out lands there too, so you don't
+bounce straight back into SSO.
+
+### Behind a reverse proxy (Nginx Proxy Manager, Traefik, Caddy…)
+
+1. Proxy `https://ipam.example.com` → `http://<docker host>:20080` (websockets not
+   needed). NPM: add a Proxy Host, scheme `http`, port `20080`, then request an SSL
+   certificate and turn on *Force SSL*.
+2. The app trusts `X-Forwarded-For` / `-Proto` / `-Host` **only** from
+   `IPAM_TRUSTED_PROXIES` (default: private ranges and loopback, which covers NPM on
+   the same host or LAN). It reads the header right to left, so a client can't
+   inject a fake LAN address.
+3. Set `IPAM_PUBLIC_URL=https://ipam.example.com` if the proxy doesn't send
+   `X-Forwarded-Host` / `-Proto`. This matters for the OIDC redirect URI.
+4. If you only ever reach the app over HTTPS, set `IPAM_COOKIE_SECURE=true`.
+5. Open Settings → Security from outside (for example, on your phone with Wi-Fi
+   off) and check that it shows your public IP and **WAN**.
+
+Don't port-forward 20080 straight from your router. With Docker's userland proxy,
+every connection can appear to come from the Docker gateway (a private address),
+which would count as LAN. The Security tab warns when it sees this.
+
+### Sessions
+
+| var | purpose |
+|---|---|
+| `IPAM_SESSION_DAYS` | sign-in lifetime, default 30 |
+| `IPAM_COOKIE_SECURE` | `true` = cookie only sent over HTTPS |
+| `IPAM_SECRET_KEY` | optional; otherwise a stable secret is generated and stored in the DB |
+
+Sessions are signed, HttpOnly, SameSite=Lax cookies. Before sign-in, only the
+login page, the app name, the logo font, the font files and `/healthz` are reachable.
 
 ## Other environment variables
 
@@ -233,6 +345,7 @@ logo font. Only the app name, logo font and font files are visible before login.
 |-----|---------|
 | `IPAM_DB` | DB path (default `/data/ipam.db`); backups and drop-in fonts sit next to it |
 | `PORT` | listen port (default `20080`) |
+| `IPAM_THREADS` | web server threads (default 8) |
 | `IPAM_UPDATE_CHECK` | `false` to hard-disable the GHCR update check |
 | `IPAM_UPDATE_IMAGE` | image to check for updates (default `ghcr.io/samschultzponsys/spazcat-ipam`) |
 
