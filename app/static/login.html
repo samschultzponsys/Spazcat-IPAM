@@ -4,10 +4,11 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
 <meta name="theme-color" content="#0a0a0c" />
-<link rel="apple-touch-icon" href="/static/apple-touch-icon.png" />
+<link rel="apple-touch-icon" href="/icon/apple-touch-icon.png" />
+<script src="/static/brand.js"></script>
 <link rel="manifest" href="/manifest.webmanifest" />
 <title>Spazcat IPAM — Sign in</title>
-<link rel="icon" type="image/svg+xml" href="/static/favicon.svg" />
+<link rel="icon" href="/icon/favicon" />
 <link rel="stylesheet" href="/api/fonts.css" />
 <style>
   :root {
@@ -95,6 +96,8 @@
       document.title = b.app_name + " — Sign in";
     }
     if (b.font_logo) document.documentElement.style.setProperty("--font-display", b.font_logo);
+    if (b.logo_style && window.SpazBrand) SpazBrand.applyLogo($("brand"), b.logo_style);
+    if (b.icon_version && window.SpazBrand) SpazBrand.setIconVersion(b.icon_version);
   }).catch(() => {});
 
   // which sign-in methods apply to this connection (LAN vs WAN)

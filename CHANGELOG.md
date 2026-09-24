@@ -4,6 +4,28 @@ Versions are always `MAJOR.MINOR` with a single-digit minor: `1.0`, `1.1` … `1
 The newest `## x.y` heading below is the version the app reports and the tag the
 GitHub Action publishes the image under — bump it here and nowhere else.
 
+## 1.5 — 2026-09-24
+
+### Added
+- **Logo style** (Settings → Appearance), previewed live on the real logo:
+  - **Gradient** with 2–3 colors, a direction and 10 presets (Spazcat, Sunset,
+    Ocean, Aurora, Fire, Candy, Mint, Neon, Gold, Steel)
+  - **Solid** single color
+  - **Outline** with a color and width
+  - an optional **pattern overlay** on gradient or solid (stripes, diagonal, dots,
+    checker, grid) with its own color, strength and scale
+  - an optional **glow**
+
+  The login page uses the same style.
+- **Icon** for the browser tab and the home screen:
+  - **Recolor the stock icon:** gradient or solid background, direction, tile color,
+    and a rounded, circle or square shape. **Match logo** copies your logo colors.
+  - **Upload your own:** PNG, JPG, WebP, GIF, ICO or SVG, up to 2 MB. Raster images
+    are cleaned and re-encoded to PNG, and the home-screen icons are generated from
+    it. SVGs are checked for scripts and used for the browser tab only.
+- Icon URLs carry a version number, so browsers and reverse-proxy caches (such as
+  Nginx Proxy Manager's "Cache Assets") pick up a new icon straight away.
+
 ## 1.4 — 2026-09-24
 
 ### Added

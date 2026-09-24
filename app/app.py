@@ -36,6 +36,7 @@ import urllib3
 from flask import Flask, g, jsonify, request, Response, send_from_directory, redirect
 
 import auth
+import branding
 
 from platforms import (
     PlatformError, UniFiError, PLATFORMS, all_fields, make_platform, normalize_mac,
@@ -51,6 +52,7 @@ DATA_DIR = os.path.dirname(os.path.abspath(DB_PATH))
 IMAGE_FONTS_DIR = os.path.join(STATIC_DIR, "fonts")      # baked into the image
 DATA_FONTS_DIR = os.path.join(DATA_DIR, "fonts")          # drop-in, no rebuild
 BACKUP_DIR = os.path.join(DATA_DIR, "backups")
+BRANDING_DIR = os.path.join(DATA_DIR, "branding")         # uploaded icon
 BACKUPS_KEPT = 10
 
 app = Flask(__name__, static_folder=None)
@@ -133,6 +135,8 @@ app.config.update(
 # fallback secret so sessions never crash before configure_secret() runs
 app.secret_key = secrets.token_hex(32)
 auth.init_app(app)
+branding.register(app, lambda: get_db(), lambda db, k, d=None: get_setting(db, k, d),
+                  lambda db, k, v: set_setting(db, k, v), BRANDING_DIR)
 
 
 def configure_secret():
@@ -187,6 +191,9 @@ SETTING_DEFAULTS = {
     "font_head": "",
     "font_body": "",
     "update_check": "1",
+    "logo_style": json.dumps(branding.LOGO_DEFAULT),
+    "icon_style": json.dumps(branding.ICON_DEFAULT),
+    "icon_version": "1",
 }
 
 
@@ -816,6 +823,10 @@ def serialize_state(db):
         "font_logo": get_setting(db, "font_logo", ""),
         "font_head": get_setting(db, "font_head", ""),
         "font_body": get_setting(db, "font_body", ""),
+        "logo_style": branding.load_json(get_setting(db, "logo_style"), branding.clean_logo),
+        "icon_style": branding.load_json(get_setting(db, "icon_style"), branding.clean_icon),
+        "icon_custom": branding.custom_kind(BRANDING_DIR),
+        "icon_version": get_setting(db, "icon_version", "1"),
         "font_options": font_options,
         "font_css": font_css,
         "font_defaults": font_defaults,
@@ -860,13 +871,14 @@ def manifest():
     """Lets phones "Add to Home Screen" as a standalone app with your app name."""
     db = get_db()
     name = get_setting(db, "app_name", DEFAULT_APP_NAME) or DEFAULT_APP_NAME
+    v = get_setting(db, "icon_version", "1")
     body = {
         "name": name, "short_name": name[:12], "start_url": "/", "scope": "/",
         "display": "standalone", "background_color": "#0a0a0c", "theme_color": "#0a0a0c",
         "icons": [
-            {"src": "/static/icon-192.png", "sizes": "192x192", "type": "image/png"},
-            {"src": "/static/icon-512.png", "sizes": "512x512", "type": "image/png"},
-            {"src": "/static/icon-maskable-512.png", "sizes": "512x512", "type": "image/png",
+            {"src": f"/icon/icon-192.png?v={v}", "sizes": "192x192", "type": "image/png"},
+            {"src": f"/icon/icon-512.png?v={v}", "sizes": "512x512", "type": "image/png"},
+            {"src": f"/icon/icon-maskable-512.png?v={v}", "sizes": "512x512", "type": "image/png",
              "purpose": "maskable"},
         ],
     }
@@ -899,6 +911,8 @@ def api_branding():
     return jsonify({
         "app_name": get_setting(db, "app_name", DEFAULT_APP_NAME) or DEFAULT_APP_NAME,
         "font_logo": css["logo"],
+        "logo_style": branding.load_json(get_setting(db, "logo_style"), branding.clean_logo),
+        "icon_version": get_setting(db, "icon_version", "1"),
         "theme": get_setting(db, "theme", "dark"),
     })
 
@@ -1154,6 +1168,14 @@ def update_settings():
     for key in _BOOL_SETTINGS:
         if key in data:
             set_setting(db, key, "1" if data[key] else "0")
+    if "logo_style" in data:
+        set_setting(db, "logo_style", json.dumps(branding.clean_logo(data["logo_style"])))
+    if "icon_style" in data:
+        new = json.dumps(branding.clean_icon(data["icon_style"]))
+        if new != get_setting(db, "icon_style"):
+            set_setting(db, "icon_style", new)
+            v = setting_int(db, "icon_version", 1) + 1
+            set_setting(db, "icon_version", v)   # new icon URLs -> caches refresh
 
     if "platform" in data:
         if data["platform"] not in PLATFORMS:
@@ -1351,9 +1373,7 @@ def sync():
         return jsonify({"ok": False, "error": str(e)}), 200
 
 
-@app.route("/favicon.ico")
-def favicon():
-    return send_from_directory(STATIC_DIR, "favicon.svg", mimetype="image/svg+xml")
+
 
 
 @app.route("/api/export.csv")
