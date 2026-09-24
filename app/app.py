@@ -19,6 +19,7 @@ Single-file Flask app (+ platforms.py). SQLite for storage. No frontend build.
 import csv
 import io
 import ipaddress
+import json
 import os
 import re
 import secrets
@@ -32,8 +33,9 @@ from urllib.parse import quote
 
 import requests
 import urllib3
-from flask import Flask, g, jsonify, request, Response, send_from_directory, session, redirect
-from werkzeug.security import generate_password_hash, check_password_hash
+from flask import Flask, g, jsonify, request, Response, send_from_directory, redirect
+
+import auth
 
 from platforms import (
     PlatformError, UniFiError, PLATFORMS, all_fields, make_platform, normalize_mac,
@@ -105,23 +107,15 @@ def version_key(v):
 
 
 # ----------------------------------------------------------------------------
-# Auth (optional, env-driven) - off by default; enable to expose over WAN
+# Sessions + auth (see auth.py for the LAN/WAN method rules)
 # ----------------------------------------------------------------------------
-#   IPAM_AUTH_ENABLED        "true" to require login (default off)
-#   IPAM_AUTH_USER           username (default "admin")
-#   IPAM_AUTH_PASSWORD       plaintext password (hashed in memory at boot)
-#   IPAM_AUTH_PASSWORD_HASH  pre-hashed password (werkzeug format); wins if set
 #   IPAM_SECRET_KEY          session-signing secret (else persisted in DB)
 #   IPAM_SESSION_DAYS        session lifetime in days (default 30)
-#   IPAM_COOKIE_SECURE       "true" to mark the cookie Secure (behind HTTPS)
+#   IPAM_COOKIE_SECURE       "true" to mark the cookie Secure (HTTPS-only access)
 def _env_bool(name, default=""):
     return os.environ.get(name, default).lower() in ("1", "true", "yes", "on")
 
 
-AUTH_ENABLED = _env_bool("IPAM_AUTH_ENABLED")
-AUTH_USER = os.environ.get("IPAM_AUTH_USER", "admin")
-_pw_hash_env = os.environ.get("IPAM_AUTH_PASSWORD_HASH", "").strip()
-_pw_plain = os.environ.get("IPAM_AUTH_PASSWORD", "")
 SESSION_DAYS = int(os.environ.get("IPAM_SESSION_DAYS", "30") or 30)
 COOKIE_SECURE = _env_bool("IPAM_COOKIE_SECURE")
 
@@ -130,30 +124,18 @@ UPDATE_IMAGE = os.environ.get("IPAM_UPDATE_IMAGE", "ghcr.io/samschultzponsys/spa
 UPDATE_CHECK_ALLOWED = os.environ.get("IPAM_UPDATE_CHECK", "true").lower() not in ("0", "false", "no", "off")
 UPDATE_TTL = 6 * 3600
 
-if _pw_hash_env:
-    AUTH_HASH = _pw_hash_env
-elif _pw_plain:
-    AUTH_HASH = generate_password_hash(_pw_plain)
-else:
-    AUTH_HASH = None
-
-if AUTH_ENABLED and not AUTH_HASH:
-    print("[auth] WARNING: IPAM_AUTH_ENABLED is set but no password was provided "
-          "(IPAM_AUTH_PASSWORD or IPAM_AUTH_PASSWORD_HASH). Auth is DISABLED.", flush=True)
-    AUTH_ENABLED = False
-
 app.config.update(
+    SESSION_COOKIE_NAME="spazcat_ipam_session",
     SESSION_COOKIE_HTTPONLY=True,
+    # Lax (not Strict) so the session survives the top-level redirect back
+    # from the OIDC provider
     SESSION_COOKIE_SAMESITE="Lax",
     SESSION_COOKIE_SECURE=COOKIE_SECURE,
     PERMANENT_SESSION_LIFETIME=timedelta(days=SESSION_DAYS),
 )
 # fallback secret so sessions never crash before configure_secret() runs
 app.secret_key = secrets.token_hex(32)
-
-# the login page needs branding + fonts before anyone is signed in
-_AUTH_PUBLIC = {"/login", "/api/login", "/api/logout", "/favicon.ico",
-                "/api/branding", "/api/fonts.css"}
+auth.init_app(app)
 
 
 def configure_secret():
@@ -173,27 +155,13 @@ def configure_secret():
         app.secret_key = val
 
 
-@app.before_request
-def _require_auth():
-    if not AUTH_ENABLED:
-        return
-    p = request.path
-    if p in _AUTH_PUBLIC or p.startswith("/static/") or p.startswith("/fonts/"):
-        return
-    if session.get("authed"):
-        return
-    if p.startswith("/api/"):
-        return jsonify({"error": "authentication required"}), 401
-    return redirect("/login")
-
-
 # ----------------------------------------------------------------------------
 # DB helpers
 # ----------------------------------------------------------------------------
 
 def get_db():
     if "db" not in g:
-        g.db = sqlite3.connect(DB_PATH)
+        g.db = sqlite3.connect(DB_PATH, timeout=15)
         g.db.row_factory = sqlite3.Row
         g.db.execute("PRAGMA foreign_keys = ON")
     return g.db
@@ -320,6 +288,14 @@ def init_db():
         cols = {r[1] for r in db.execute("PRAGMA table_info(devices)").fetchall()}
         if "locked" not in cols:
             db.execute("ALTER TABLE devices ADD COLUMN locked INTEGER NOT NULL DEFAULT 0")
+        # 1.2: per-pool header style + hide-when-empty
+        pcols = {r[1] for r in db.execute("PRAGMA table_info(pools)").fetchall()}
+        if "hide_empty" not in pcols:
+            db.execute("ALTER TABLE pools ADD COLUMN hide_empty INTEGER NOT NULL DEFAULT 0")
+        if "style" not in pcols:
+            db.execute("ALTER TABLE pools ADD COLUMN style TEXT NOT NULL DEFAULT '{}'")
+        # 1.2: WAL lets the web server (now multi-threaded) read while a sync writes
+        db.execute("PRAGMA journal_mode=WAL")
 
         # 1.1: auto-sync became value + unit; derive them from the old minutes
         have = {r[0] for r in db.execute("SELECT key FROM settings").fetchall()}
@@ -483,6 +459,57 @@ def sort_devices(db, only_pool=None):
         db.execute("UPDATE devices SET pool_id=? WHERE id=?", (target, d["id"]))
         moved += 1
     return moved
+
+
+# ----------------------------------------------------------------------------
+# Pool header style
+# ----------------------------------------------------------------------------
+# Stored as JSON on the pool row; anything unknown or out of range is dropped
+# and the default used, so a hand-edited DB or old client can't break the UI.
+
+POOL_STYLE_DEFAULTS = {
+    "font": "",            # font id from Settings -> Appearance; "" = the global header font
+    "size": 100,           # % of the base text size
+    "bold": True,
+    "italic": False,
+    "uppercase": False,
+    "spacing": 1,          # letter spacing, px
+    "name_color": "",      # "" = normal text color
+    "tint": 12,            # header background strength, % of the pool color
+    "show_dot": True,
+    "show_subnets": True,
+    "show_notes": True,
+    "show_count": True,
+}
+_POOL_STYLE_RANGES = {"size": (60, 250), "spacing": (0, 12), "tint": (0, 60)}
+
+
+def clean_pool_style(raw):
+    raw = raw if isinstance(raw, dict) else {}
+    out = {}
+    for k, dflt in POOL_STYLE_DEFAULTS.items():
+        v = raw.get(k, dflt)
+        if isinstance(dflt, bool):
+            v = bool(v)
+        elif isinstance(dflt, int):
+            try:
+                lo, hi = _POOL_STYLE_RANGES[k]
+                v = min(hi, max(lo, int(float(v))))
+            except (TypeError, ValueError):
+                v = dflt
+        elif k == "name_color":
+            v = v if isinstance(v, str) and re.fullmatch(r"#[0-9a-fA-F]{6}", v) else ""
+        else:
+            v = str(v or "")[:80]
+        out[k] = v
+    return out
+
+
+def load_pool_style(text):
+    try:
+        return clean_pool_style(json.loads(text or "{}"))
+    except ValueError:
+        return dict(POOL_STYLE_DEFAULTS)
 
 
 # ----------------------------------------------------------------------------
@@ -741,6 +768,8 @@ def serialize_state(db):
             "notes": p["notes"],
             "sort_order": p["sort_order"],
             "is_default": bool(p["is_default"]),
+            "hide_empty": bool(p["hide_empty"]),
+            "style": load_pool_style(p["style"]),
             "devices": dev_by_pool.get(p["id"], []),
         })
 
@@ -793,7 +822,8 @@ def serialize_state(db):
         "font_defaults": font_defaults,
         "update_check": setting_bool(db, "update_check", True),
         "update_check_allowed": UPDATE_CHECK_ALLOWED,
-        "auth_enabled": AUTH_ENABLED,
+        "auth": auth.request_status(),
+        "auth_enabled": auth.request_status()["required"],
         "version": VERSION,
     }
     excluded = [dict(r) for r in db.execute(
@@ -820,9 +850,21 @@ def index():
 
 @app.route("/login")
 def login_page():
-    if not AUTH_ENABLED or session.get("authed"):
-        return redirect("/")
+    go = auth.login_redirect()
+    if go:
+        return redirect(go)
     return send_from_directory(STATIC_DIR, "login.html")
+
+
+@app.route("/healthz")
+def healthz():
+    """For Docker HEALTHCHECK / proxy health checks. Public, no data."""
+    return jsonify({"ok": True, "version": VERSION})
+
+
+@app.route("/api/auth/status")
+def api_auth_status():
+    return jsonify(auth.security_report())
 
 
 @app.route("/api/branding")
@@ -834,29 +876,6 @@ def api_branding():
         "font_logo": css["logo"],
         "theme": get_setting(db, "theme", "dark"),
     })
-
-
-@app.route("/api/login", methods=["POST"])
-def api_login():
-    if not AUTH_ENABLED:
-        return jsonify({"ok": True})  # nothing to do
-    data = request.get_json(force=True) or {}
-    user = (data.get("username") or "").strip()
-    pw = data.get("password") or ""
-    # constant-ish time: always run the hash check
-    ok = bool(AUTH_HASH) and user == AUTH_USER and check_password_hash(AUTH_HASH, pw)
-    if not ok:
-        return jsonify({"ok": False, "error": "Invalid username or password"}), 401
-    session.clear()
-    session["authed"] = True
-    session.permanent = True
-    return jsonify({"ok": True})
-
-
-@app.route("/api/logout", methods=["POST"])
-def api_logout():
-    session.clear()
-    return jsonify({"ok": True})
 
 
 @app.route("/static/<path:fname>")
@@ -905,8 +924,10 @@ def create_pool():
     row = db.execute("SELECT MAX(sort_order) AS m FROM pools").fetchone()
     nxt = (row["m"] or 0) + 1
     cur = db.execute(
-        "INSERT INTO pools (name,color,subnets,notes,sort_order,is_default) VALUES (?,?,?,?,?,0)",
-        (name, color, subnets, notes, nxt),
+        "INSERT INTO pools (name,color,subnets,notes,sort_order,is_default,hide_empty,style) "
+        "VALUES (?,?,?,?,?,0,?,?)",
+        (name, color, subnets, notes, nxt, 1 if data.get("hide_empty") else 0,
+         json.dumps(clean_pool_style(data.get("style")))),
     )
     moved = sort_devices(db, only_pool=cur.lastrowid) if data.get("claim_matching") else 0
     db.commit()
@@ -928,6 +949,12 @@ def update_pool(pid):
                     return jsonify({"error": err}), 400
             fields.append(f"{key}=?")
             values.append(val)
+    if "hide_empty" in data:
+        fields.append("hide_empty=?")
+        values.append(1 if data["hide_empty"] else 0)
+    if "style" in data:
+        fields.append("style=?")
+        values.append(json.dumps(clean_pool_style(data["style"])))
     if fields:
         values.append(pid)
         db.execute(f"UPDATE pools SET {','.join(fields)} WHERE id=?", values)
@@ -1351,7 +1378,7 @@ def _auto_sync_loop():
     while True:
         time.sleep(30)
         try:
-            with closing(sqlite3.connect(DB_PATH)) as db:
+            with closing(sqlite3.connect(DB_PATH, timeout=15)) as db:
                 db.row_factory = sqlite3.Row
                 if update_check_enabled(db) and now_ts() - _update["checked_at"] >= UPDATE_TTL:
                     run_update_check()
@@ -1384,4 +1411,11 @@ if __name__ == "__main__":
     configure_secret()
     start_auto_sync()
     port = int(os.environ.get("PORT", "20080"))
-    app.run(host="0.0.0.0", port=port)
+    try:
+        from waitress import serve
+    except ImportError:  # dev fallback
+        app.run(host="0.0.0.0", port=port)
+    else:
+        # single process (the auto-sync thread must run exactly once), many threads
+        serve(app, host="0.0.0.0", port=port, threads=int(os.environ.get("IPAM_THREADS", "8")),
+              ident="spazcat-ipam")

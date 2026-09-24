@@ -95,6 +95,29 @@
   .pool-meta { color: var(--muted); font-size: 0.82em; }
   .pool-meta .sub { color: var(--accent-2); }
   .pool-head .spacer { flex: 1; }
+  .caret {
+    background: none; border: none; padding: 0 2px; color: var(--muted);
+    font-size: 0.8em; width: 1.4em; line-height: 1; transition: transform .15s ease;
+  }
+  .caret:hover { color: var(--text); border: none; }
+  .caret.closed { transform: rotate(-90deg); }
+  .pool.collapsed .pool-head { border-bottom: none; }
+  .pool.drag-over { outline: 2px dashed var(--accent); outline-offset: -2px; }
+  .pool-preview { border: 1px solid var(--border); border-radius: 10px; overflow: hidden; margin-bottom: 14px; }
+  .hidden-note { color: var(--muted); font-size: 0.72em; margin: -4px 0 14px; }
+  .style-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 0 14px; }
+  .style-grid .field.check { margin-bottom: 6px; }
+  .section-label {
+    font-family: var(--font-head); color: var(--accent-2); font-size: 0.78em;
+    margin: 16px 0 10px; padding-top: 12px; border-top: 1px solid var(--border);
+  }
+  input[type=range] { padding: 0 !important; }
+  .sec-table { width: 100%; font-size: 0.74em; border-collapse: collapse; margin-bottom: 12px; }
+  .sec-table td { padding: 5px 6px; border-bottom: 1px solid var(--border); vertical-align: top; }
+  .sec-table td:first-child { color: var(--muted); white-space: nowrap; width: 38%; }
+  .sec-warn { color: var(--danger); font-size: 0.74em; margin-bottom: 8px; line-height: 1.45; }
+  .pill { display: inline-block; padding: 1px 8px; border-radius: 999px; border: 1px solid var(--border); margin: 0 4px 2px 0; }
+  .pill.on { border-color: var(--ok); color: var(--ok); }
   .pool-actions button { padding: 5px 9px; font-size: 0.72em; }
   .pool-body { padding: 8px; min-height: 44px; }
   .pool-body.drag-over { background: rgba(139,92,246,0.08); }
@@ -153,6 +176,14 @@
     -webkit-appearance: none; appearance: none;
   }
   .swatch-wheel.sel { border-color: var(--text); }
+  /* beat the generic ".field input" rule so the wheel stays a small swatch */
+  .field input.swatch-wheel {
+    width: 26px; height: 26px; padding: 0; border-radius: 7px;
+    border: 2px solid transparent;
+    background: conic-gradient(from 0deg,
+      #ef4444, #f5a142, #eab308, #22c55e, #06b6d4, #3b82f6, #8b5cf6, #ec4899, #ef4444);
+  }
+  .field input.swatch-wheel.sel { border-color: var(--text); }
   .swatch-wheel::-webkit-color-swatch-wrapper { padding: 0; }
   .swatch-wheel::-webkit-color-swatch { border: none; opacity: 0; }
   .swatch-wheel::-moz-color-swatch { border: none; opacity: 0; }
@@ -310,6 +341,16 @@ function App() {
   const [fontPreview, setFontPreview] = useState(null);   // unsaved Appearance picks
   const [ver, setVer] = useState(null);                   // {version, changelog, update}
   const [showLog, setShowLog] = useState(false);
+  const [showHidden, setShowHidden] = useState(false);
+  // collapsed pools are a per-browser view preference
+  const [collapsed, setCollapsed] = useState(() => {
+    try { return JSON.parse(lsGet("ipam-collapsed") || "[]"); } catch(e) { return []; }
+  });
+  const toggleCollapsed = (id) => setCollapsed(prev => {
+    const next = prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id];
+    lsSet("ipam-collapsed", JSON.stringify(next));
+    return next;
+  });
   // localStorage is only a pre-load hint to avoid a flash; the DB (per-instance)
   // is the source of truth, applied once state loads and pushed back on change.
   const [theme, setThemeState] = useState(lsGet("ipam-theme") || "dark");
@@ -444,9 +485,18 @@ function App() {
     if (poolHit) return true;               // section name / notes / subnet hit
     return ipMatch(d.ip) || textMatch(d);
   };
+  // "hide when empty" pools come back as drop targets while dragging, and
+  // whenever the user asks to see them (otherwise you couldn't edit them)
+  const hiddenEmpty = state.pools.filter(p => p.hide_empty && p.devices.length === 0);
   const shownPools = state.pools
+    .filter(p => !(p.hide_empty && p.devices.length === 0) || dragId != null || showHidden)
     .map(p => { const ph = poolHitFn(p); return {...p, devices: p.devices.filter(d=>matchDev(d,ph))}; })
     .filter(p => !filtering || p.devices.length > 0);
+  const auth = s.auth || {};
+  const logout = async () => {
+    const r = await api("/api/logout", {method:"POST"});
+    window.location = (r && r.redirect) || "/login";
+  };
 
   const upd = ver && ver.update;
   return (
@@ -465,9 +515,9 @@ function App() {
           <button className="ghost" title="Larger text" style={{padding:"6px 9px", fontSize:"1.15em"}}
             onClick={()=>setFs(Math.min(26, fs+1))}>A+</button>
           <button onClick={()=>setShowSettings(true)} className="ghost" title="Settings">⚙</button>
-          {s.auth_enabled && (
-            <button className="ghost" title="Sign out"
-              onClick={async()=>{ await api("/api/logout",{method:"POST"}); window.location="/login"; }}>
+          {auth.can_logout && (
+            <button className="ghost" title={`Signed in${auth.user ? " as " + auth.user : ""} (${auth.authed_via}) — sign out`}
+              onClick={logout}>
               <span style={{fontSize:"0.8em"}}>⎋ logout</span>
             </button>
           )}
@@ -497,6 +547,12 @@ function App() {
           onClick={()=>setResOnly(!resOnly)}>RES only</button>
         {filtering && <button onClick={()=>{setQuery("");setResOnly(false);}}>clear</button>}
       </div>
+      {hiddenEmpty.length > 0 && !filtering && (
+        <div className="hidden-note">
+          {hiddenEmpty.length} empty pool{hiddenEmpty.length>1?"s":""} hidden{" — "}
+          <button className="link" onClick={()=>setShowHidden(!showHidden)}>{showHidden ? "hide" : "show"}</button>
+        </div>
+      )}
 
       {shownPools.map(pool => (
         <Pool key={pool.id} pool={pool}
@@ -505,6 +561,9 @@ function App() {
           onDrop={onDrop}
           onEditDevice={setEditDevice}
           onEditPool={setEditPool}
+          settings={s}
+          collapsed={collapsed.includes(pool.id) && !filtering}
+          onToggle={()=>toggleCollapsed(pool.id)}
           reload={load} flash={flash} filtering={filtering} />
       ))}
 
@@ -513,7 +572,7 @@ function App() {
           onClose={()=>setEditDevice(null)} reload={load} />
       )}
       {editPool && (
-        <PoolModal pool={editPool}
+        <PoolModal pool={editPool} settings={s}
           onClose={()=>setEditPool(null)} reload={load} flash={flash} />
       )}
       {showSettings && (
@@ -537,8 +596,42 @@ function App() {
   );
 }
 
+const POOL_STYLE_DEFAULTS = {
+  font: "", size: 100, bold: true, italic: false, uppercase: false, spacing: 1,
+  name_color: "", tint: 12, show_dot: true, show_subnets: true, show_notes: true, show_count: true,
+};
+
+function PoolHeader({pool, settings, count, collapsed, onToggle, actions}) {
+  const st = {...POOL_STYLE_DEFAULTS, ...(pool.style || {})};
+  const fontCssVal = st.font ? fontCss(settings || {}, "head", st.font) : null;
+  const nameStyle = {
+    fontFamily: fontCssVal || "var(--font-head)",
+    fontSize: `${st.size / 100}em`,
+    fontWeight: st.bold ? 700 : 400,
+    fontStyle: st.italic ? "italic" : "normal",
+    textTransform: st.uppercase ? "uppercase" : "none",
+    letterSpacing: `${st.spacing}px`,
+    color: st.name_color || undefined,
+  };
+  return (
+    <div className="pool-head" style={{background: hexToRgba(pool.color || "#6b7280", st.tint / 100)}}>
+      {onToggle !== undefined && (
+        <button className={"caret" + (collapsed ? " closed" : "")} onClick={onToggle}
+          title={collapsed ? "Expand" : "Collapse"}>▼</button>
+      )}
+      {st.show_dot && <span className="pool-dot" style={{background: pool.color}}></span>}
+      <span className="pool-name" style={nameStyle}>{pool.name || "Pool name"}</span>
+      {st.show_subnets && pool.subnets && <span className="pool-meta sub">[{pool.subnets}]</span>}
+      {st.show_notes && pool.notes && <span className="pool-meta">— {pool.notes}</span>}
+      <span className="spacer"></span>
+      {st.show_count && <span className="pool-meta">{count}</span>}
+      {actions}
+    </div>
+  );
+}
+
 function Pool({pool, dragId, setDragId, overPool, setOverPool, onDrop,
-               onEditDevice, onEditPool, reload, flash}) {
+               onEditDevice, onEditPool, reload, flash, settings, collapsed, onToggle}) {
   const faint = hexToRgba(pool.color, 0.07);
   const isOver = overPool === pool.id;
 
@@ -548,32 +641,31 @@ function Pool({pool, dragId, setDragId, overPool, setOverPool, onDrop,
     reload();
   };
 
+  // the whole card is the drop target, so collapsed pools still accept drops
   return (
-    <div className="pool" style={{background: faint, borderColor: hexToRgba(pool.color,0.35)}}>
-      <div className="pool-head" style={{background: hexToRgba(pool.color,0.12)}}>
-        <span className="pool-dot" style={{background: pool.color}}></span>
-        <span className="pool-name">{pool.name}</span>
-        {pool.subnets && <span className="pool-meta sub">[{pool.subnets}]</span>}
-        {pool.notes && <span className="pool-meta">— {pool.notes}</span>}
-        <span className="spacer"></span>
-        <span className="pool-meta">{pool.devices.length}</span>
-        <div className="pool-actions" style={{display:"flex",gap:"6px",marginLeft:"8px"}}>
-          <button onClick={()=>onEditPool(pool)}>edit</button>
-          {!pool.is_default && <button className="danger" onClick={delPool}>×</button>}
+    <div className={"pool" + (collapsed ? " collapsed" : "") + (isOver && collapsed ? " drag-over" : "")}
+      style={{background: faint, borderColor: hexToRgba(pool.color,0.35)}}
+      onDragOver={e=>{e.preventDefault(); setOverPool(pool.id);}}
+      onDragLeave={e=>{ if (!e.currentTarget.contains(e.relatedTarget)) setOverPool(null); }}
+      onDrop={()=>onDrop(pool.id)}>
+      <PoolHeader pool={pool} settings={settings} count={pool.devices.length}
+        collapsed={collapsed} onToggle={onToggle}
+        actions={
+          <div className="pool-actions" style={{display:"flex",gap:"6px",marginLeft:"8px"}}>
+            <button onClick={()=>onEditPool(pool)}>edit</button>
+            {!pool.is_default && <button className="danger" onClick={delPool}>×</button>}
+          </div>} />
+      {!collapsed && (
+        <div className={"pool-body" + (isOver ? " drag-over" : "")}>
+          {pool.devices.length === 0 && (
+            <div className="empty-hint">No devices — drag one here.</div>
+          )}
+          {pool.devices.map(d => (
+            <Device key={d.id} d={d} poolColor={pool.color} setDragId={setDragId}
+              onEdit={()=>onEditDevice(d)} reload={reload} />
+          ))}
         </div>
-      </div>
-      <div className={"pool-body" + (isOver ? " drag-over" : "")}
-        onDragOver={e=>{e.preventDefault(); setOverPool(pool.id);}}
-        onDragLeave={()=>setOverPool(null)}
-        onDrop={()=>onDrop(pool.id)}>
-        {pool.devices.length === 0 && (
-          <div className="empty-hint">No devices — drag one here.</div>
-        )}
-        {pool.devices.map(d => (
-          <Device key={d.id} d={d} poolColor={pool.color} setDragId={setDragId}
-            onEdit={()=>onEditDevice(d)} reload={reload} />
-        ))}
-      </div>
+      )}
     </div>
   );
 }
@@ -682,12 +774,16 @@ function DeviceModal({device, pools, onClose, reload}) {
   );
 }
 
-function PoolModal({pool, onClose, reload, flash}) {
+function PoolModal({pool, settings, onClose, reload, flash}) {
   const [f, setF] = useState({
     name: pool.name||"", color: pool.color||"#8b5cf6",
     subnets: pool.subnets||"", notes: pool.notes||"",
     claim_matching: true,
+    hide_empty: !!pool.hide_empty,
+    style: {...POOL_STYLE_DEFAULTS, ...(pool.style || {})},
   });
+  const setSt = (k,v) => setF(prev => ({...prev, style: {...prev.style, [k]: v}}));
+  const fontOpts = (settings && settings.font_options) || [];
   const [err, setErr] = useState(null);
   const isNew = !pool.id;
   const set = (k,v)=>setF({...f,[k]:v});
@@ -703,8 +799,12 @@ function PoolModal({pool, onClose, reload, flash}) {
   };
   return (
     <div className="overlay" onClick={onClose}>
-      <div className="modal" onClick={e=>e.stopPropagation()}>
+      <div className="modal wide" onClick={e=>e.stopPropagation()}>
         <h3>{isNew ? "New pool" : "Edit pool"}</h3>
+        <div className="pool-preview" style={{background: hexToRgba(f.color, 0.07)}}>
+          <PoolHeader pool={{...f}} settings={settings}
+            count={isNew ? 0 : (pool.devices || []).length} />
+        </div>
         <div className="field"><label>Name</label>
           <input value={f.name} onChange={e=>set("name",e.target.value)}
             placeholder="Cameras" /></div>
@@ -729,9 +829,49 @@ function PoolModal({pool, onClose, reload, flash}) {
               value={f.color} onChange={e=>set("color",e.target.value)}
               title="Custom color" />
           </div></div>
+
+        <div className="section-label">Visibility</div>
+        <div className="field check"><label>
+          <input type="checkbox" checked={f.hide_empty} onChange={e=>set("hide_empty",e.target.checked)} />
+          Hide this pool while it has no devices{pool.is_default
+            ? " — it reappears automatically the moment anything lands in Unallocated"
+            : " (it reappears as soon as a device is in it, and while you drag a device)"}</label></div>
+
+        <div className="section-label">Header style</div>
+        <div className="style-grid">
+          <div className="field"><label>Font</label>
+            <select value={f.style.font} onChange={e=>setSt("font", e.target.value)}>
+              <option value="">Header font from Appearance</option>
+              {fontOpts.map(o=><option key={o.id} value={o.id}>{o.label}</option>)}
+            </select></div>
+          <div className="field"><label>Name color</label>
+            <div className="inline">
+              <input type="color" style={{padding:"2px", height:"36px"}}
+                value={f.style.name_color || "#e6e6ea"} onChange={e=>setSt("name_color", e.target.value)} />
+              <button type="button" onClick={()=>setSt("name_color","")}
+                disabled={!f.style.name_color}>default</button>
+            </div></div>
+          <div className="field"><label>Size — {f.style.size}%</label>
+            <input type="range" min="60" max="250" step="5" value={f.style.size}
+              onChange={e=>setSt("size", parseInt(e.target.value))} /></div>
+          <div className="field"><label>Letter spacing — {f.style.spacing}px</label>
+            <input type="range" min="0" max="12" value={f.style.spacing}
+              onChange={e=>setSt("spacing", parseInt(e.target.value))} /></div>
+          <div className="field"><label>Header tint — {f.style.tint}%</label>
+            <input type="range" min="0" max="60" value={f.style.tint}
+              onChange={e=>setSt("tint", parseInt(e.target.value))} /></div>
+          <div></div>
+          {[["bold","Bold"],["italic","Italic"],["uppercase","UPPERCASE"],
+            ["show_dot","Show color dot"],["show_subnets","Show subnets"],
+            ["show_notes","Show notes"],["show_count","Show device count"]].map(([k,l])=>(
+            <div className="field check" key={k}><label>
+              <input type="checkbox" checked={!!f.style[k]} onChange={e=>setSt(k, e.target.checked)} />
+              {l}</label></div>
+          ))}
+        </div>
         {err && <div className="test-result err">{err}</div>}
         <div className="modal-actions">
-          <span></span>
+          <button type="button" onClick={()=>setF(prev=>({...prev, style: {...POOL_STYLE_DEFAULTS}}))}>Reset style</button>
           <div className="right">
             <button onClick={onClose}>Cancel</button>
             <button className="primary" onClick={save}>Save</button>
@@ -849,7 +989,7 @@ function SettingsModal({settings, excluded, onPreview, onClose, reload, flash}) 
       </select></div>
   );
 
-  const tabs = [["platform","Platform"],["sync","Sync & pools"],["look","Appearance"],["maint","Maintenance"]];
+  const tabs = [["platform","Platform"],["sync","Sync & pools"],["look","Appearance"],["security","Security"],["maint","Maintenance"]];
   return (
     <div className="overlay" onClick={onClose}>
       <div className="modal wide" onClick={e=>e.stopPropagation()}>
@@ -928,6 +1068,8 @@ function SettingsModal({settings, excluded, onPreview, onClose, reload, flash}) 
           </div>
         </>}
 
+        {tab === "security" && <SecurityTab />}
+
         {tab === "maint" && <>
           <div className="field check"><label>
             <input type="checkbox" checked={!!f.update_check} disabled={!settings.update_check_allowed}
@@ -961,6 +1103,41 @@ function SettingsModal({settings, excluded, onPreview, onClose, reload, flash}) 
       </div>
     </div>
   );
+}
+
+function SecurityTab() {
+  const [r, setR] = useState(null);
+  useEffect(() => { api("/api/auth/status").then(setR); }, []);
+  if (!r) return <div className="hint">Loading…</div>;
+  const pills = (list) => list.length
+    ? list.map(m => <span key={m} className={"pill" + (m !== "none" ? " on" : "")}>{m}</span>)
+    : <span className="pill" style={{color:"var(--danger)"}}>blocked</span>;
+  const o = r.oidc || {};
+  return <>
+    {(r.warnings||[]).map((w,i)=><div key={i} className="sec-warn">⚠ {w}</div>)}
+    <table className="sec-table"><tbody>
+      <tr><td>You are connecting from</td><td>{r.client_ip || "?"} → <b>{r.zone.toUpperCase()}</b>
+        {r.via_proxy ? ` (via proxy ${r.peer_ip})` : ""}</td></tr>
+      <tr><td>Signed in</td><td>{r.authed_via ? `${r.user || "?"} via ${r.authed_via}` : (r.required ? "no" : "not required here")}</td></tr>
+      <tr><td>LAN sign-in</td><td>{pills(r.lan_methods)}</td></tr>
+      <tr><td>WAN sign-in</td><td>{pills(r.wan_methods)}</td></tr>
+      <tr><td>LAN networks</td><td>{r.lan_networks.join(", ")}</td></tr>
+      <tr><td>Trusted proxies</td><td>{r.trusted_proxies.join(", ")}</td></tr>
+      <tr><td>Local users</td><td>{r.local_users.join(", ") || "—"}</td></tr>
+      <tr><td>Access tokens</td><td>{r.tokens.length ? `${r.tokens.join(", ")} (URL parameter ?${r.token_param}=…)` : "—"}</td></tr>
+      <tr><td>OIDC</td><td>{o.configured
+        ? <>{o.issuer}<br/>client {o.client_id}<br/>redirect URI <code>{o.redirect_uri}</code><br/>
+            button "{o.button_text}"{o.auto_login ? ", auto sign-in on" : ""}
+            {(o.allowed_users.length || o.allowed_groups.length) ?
+              <><br/>allowed: {[...o.allowed_users, ...o.allowed_groups.map(x=>"group:"+x)].join(", ")}</> : null}</>
+        : "not configured"}</td></tr>
+    </tbody></table>
+    <div className="help-box">
+      Sign-in rules are set with environment variables in your compose file (<code>IPAM_AUTH_LAN</code>,{" "}
+      <code>IPAM_AUTH_WAN</code>, …), not here. That way nobody using the app can switch them off.
+      See the README section “Authentication”.
+    </div>
+  </>;
 }
 
 // Minimal markdown for CHANGELOG.md: ### headings, "- " bullets (with

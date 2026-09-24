@@ -44,46 +44,95 @@
   button:hover { filter: brightness(1.1); }
   .err {
     color: var(--danger); font-size: 12px; margin-top: 14px; min-height: 16px; text-align: center;
+    line-height: 1.45;
   }
+  .sso { background: transparent; border: 1px solid var(--accent); color: var(--text); }
+  .or {
+    display: flex; align-items: center; gap: 10px; color: var(--muted);
+    font-size: 11px; margin: 20px 0 0;
+  }
+  .or::before, .or::after { content: ""; flex: 1; border-top: 1px solid var(--border); }
+  .note { color: var(--muted); font-size: 12px; text-align: center; line-height: 1.5; margin-top: 10px; }
+  .hide { display: none; }
 </style>
 </head>
 <body>
   <div class="card">
     <div class="brand" id="brand">SPAZCAT IPAM</div>
-    <label for="u">Username</label>
-    <input id="u" autocomplete="username" autofocus />
-    <label for="p">Password</label>
-    <input id="p" type="password" autocomplete="current-password" />
-    <button id="go">Sign in</button>
+    <div id="local" class="hide">
+      <label for="u">Username</label>
+      <input id="u" autocomplete="username" autofocus />
+      <label for="p">Password</label>
+      <input id="p" type="password" autocomplete="current-password" />
+      <button id="go">Sign in</button>
+    </div>
+    <div id="or" class="or hide">or</div>
+    <button id="sso" class="sso hide">Sign in with SSO</button>
+    <div id="tokenNote" class="note hide">
+      This instance also accepts an access link. Open the link you were given.
+    </div>
     <div class="err" id="err"></div>
   </div>
 <script>
+  const $ = (id) => document.getElementById(id);
+  const params = new URLSearchParams(location.search);
+  const next = params.get("next") || "/";
+  const err = $("err");
+  if (params.get("error")) err.textContent = params.get("error");
+
   // name + logo font come from Settings (public endpoint, no login needed)
   fetch("/api/branding").then(r => r.json()).then(b => {
     if (b.app_name) {
-      document.getElementById("brand").textContent = b.app_name;
+      $("brand").textContent = b.app_name;
       document.title = b.app_name + " — Sign in";
     }
     if (b.font_logo) document.documentElement.style.setProperty("--font-display", b.font_logo);
   }).catch(() => {});
-  const err = document.getElementById("err");
+
+  // which sign-in methods apply to this connection (LAN vs WAN)
+  fetch("/api/auth/config").then(r => r.json()).then(c => {
+    if (c.blocked) {
+      err.textContent = "Sign-in is misconfigured for this network, so access is blocked. " +
+                        "Check the server log / IPAM_AUTH_* settings.";
+      return;
+    }
+    if (c.methods && c.methods.length === 1 && c.methods[0] === "none") { location = next; return; }
+    if (c.local) $("local").classList.remove("hide");
+    if (c.oidc) {
+      $("sso").textContent = c.oidc_button || "Sign in with SSO";
+      $("sso").classList.remove("hide");
+      if (c.local) $("or").classList.remove("hide");
+      else $("sso").style.marginTop = "0";
+    }
+    if (c.token) {
+      $("tokenNote").classList.remove("hide");
+      if (!c.local && !c.oidc) $("tokenNote").textContent =
+        "This instance is opened with an access link. Use the link you were given.";
+    }
+    if (c.local) $("u").focus();
+  }).catch(() => { $("local").classList.remove("hide"); });
+
+  $("sso").addEventListener("click", () => {
+    location = "/auth/oidc/login?" + new URLSearchParams({next});
+  });
+
   async function submit() {
     err.textContent = "";
-    const username = document.getElementById("u").value;
-    const password = document.getElementById("p").value;
+    const username = $("u").value;
+    const password = $("p").value;
     try {
       const r = await fetch("/api/login", {
         method: "POST",
         headers: {"Content-Type": "application/json"},
-        body: JSON.stringify({username, password}),
+        body: JSON.stringify({username, password, next}),
       });
       const d = await r.json();
-      if (d.ok) { window.location = "/"; }
+      if (d.ok) { location = d.next || "/"; }
       else { err.textContent = d.error || "Sign in failed"; }
     } catch (e) { err.textContent = "Network error"; }
   }
-  document.getElementById("go").addEventListener("click", submit);
-  document.querySelectorAll("input").forEach(el =>
+  $("go").addEventListener("click", submit);
+  document.querySelectorAll("#local input").forEach(el =>
     el.addEventListener("keydown", e => { if (e.key === "Enter") submit(); }));
 </script>
 </body>
