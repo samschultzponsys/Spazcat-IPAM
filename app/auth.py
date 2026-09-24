@@ -80,7 +80,7 @@ DEFAULT_STORED = {
 PUBLIC_PATHS = {"/login", "/api/login", "/api/logout", "/api/auth/config", "/favicon.ico",
                 "/api/branding", "/api/fonts.css", "/healthz", "/manifest.webmanifest",
                 "/auth/oidc/login", "/auth/oidc/callback"}
-PUBLIC_PREFIXES = ("/static/", "/fonts/")
+PUBLIC_PREFIXES = ("/static/", "/fonts/", "/icon/")
 
 _DB_PATH = None
 _APP = None

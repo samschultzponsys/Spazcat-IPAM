@@ -6,3 +6,5 @@ waitress==3.0.2
 authlib==1.8.0
 # SSH sync for OpenWrt / Alta Labs Route10
 paramiko==5.0.0
+# icon rendering + safe re-encoding of uploaded icons
+pillow==12.3.0

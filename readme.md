@@ -209,6 +209,28 @@ the controller can't be reached, the app waits one full interval before retrying
 - Theme (☀/🌙) and text size (A−/A+) are in the toolbar. All appearance settings are
   stored per instance, so every browser sees the same settings.
 
+## Logo & icon
+
+**Settings → Appearance** has two branding sections. Changes preview live, and
+**Save** keeps them.
+
+- **Logo style** for the top-left wordmark and the login page. Pick a **gradient**
+  (2–3 colors, a direction, or one of the presets), a **solid** color or an
+  **outline**. Gradient and solid fills can also take a pattern overlay (stripes,
+  diagonal, dots, checker or grid) with its own color, strength and scale. There's
+  also an optional glow.
+- **Icon** for the browser tab, bookmarks and home screen. Recolor the stock grid
+  icon: gradient or solid background, tile color, and a rounded, circle or square
+  shape. **Match logo** copies your logo colors. Or **upload your own**.
+- **Uploads:** PNG, JPG, WebP, GIF, ICO or SVG, up to 2 MB. Raster images are
+  re-encoded to PNG, and the home-screen icons (180/192/512 px and Android's
+  maskable) are generated from them. SVG uploads are used for the browser tab
+  only, and are rejected if they contain scripts, links or embedded content.
+  Uploads are stored in `data/branding/`.
+
+Icon URLs include a version (`/icon/favicon?v=3`) that changes with every edit, so
+a reverse-proxy cache can't keep serving the old icon.
+
 ## Versions, changelog & updates
 
 - Versions are always **`MAJOR.MINOR` with a single-digit minor**: `1.0`, `1.1` …
