@@ -1,9 +1,12 @@
 # IMAGE deploy. Runs the prebuilt image from GHCR (built by the GitHub Action).
-# Replace OWNER/REPO with your lowercase path, e.g. ghcr.io/spazcat/spazcat-ipam.
-# Run from the repo root:  docker compose -f compose.image.yaml up -d
+# Run from the repo root:  docker compose up -d
+# Update:                  docker compose pull && docker compose up -d
 #
-# Fonts are gitignored, so they're not in the image (wordmark falls back to a
-# mono stack). To restore them, uncomment the fonts bind-mount below.
+# Your data lives in ./data on the host (DB, automatic pre-upgrade backups in
+# ./data/backups, optional drop-in fonts in ./data/fonts). Pulling a new image
+# never touches it, so every new container picks up where the last one left off.
+#
+# Pin a version instead of latest if you prefer, e.g. :1.1 (tags are x.y).
 services:
   spazcat-ipam:
     image: ghcr.io/samschultzponsys/spazcat-ipam:latest
@@ -20,9 +23,12 @@ services:
       # IPAM_AUTH_PASSWORD: "change-me"          # or IPAM_AUTH_PASSWORD_HASH
       # IPAM_SESSION_DAYS: "30"
       # IPAM_COOKIE_SECURE: "true"               # when behind HTTPS
+
+      # --- Update check (on by default; reads this image's tag list on ghcr.io) ---
+      # IPAM_UPDATE_CHECK: "false"               # hard-disable, overrides the UI toggle
+      # IPAM_UPDATE_IMAGE: "ghcr.io/you/your-fork"
     volumes:
       - ./data:/data
-      # - ./app/static/fonts:/app/static/fonts:ro
     ports:
       - "20080:20080"
     restart: unless-stopped

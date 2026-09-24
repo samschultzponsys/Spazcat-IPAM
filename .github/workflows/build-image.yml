@@ -1,11 +1,15 @@
 name: build-image
 
 # Build the container and push it to GitHub Container Registry (GHCR).
-# Runs on pushes to main, on version tags (v1.0.0 ...), and on manual dispatch.
+# Runs on pushes to main and on manual dispatch.
+#
+# Versioning: the newest "## x.y" heading in CHANGELOG.md is the version.
+# Every build on main publishes :latest, :<x.y> and :sha-<short>. The app
+# checks GHCR for a higher x.y tag to show its "update available" dot, so bump
+# the changelog heading when you cut a release (1.0 ... 1.9, then 2.0).
 on:
   push:
     branches: [main]
-    tags: ["v*"]
   workflow_dispatch:
 
 permissions:
@@ -23,6 +27,16 @@ jobs:
       - name: Compute image name
         run: echo "IMAGE=ghcr.io/${GITHUB_REPOSITORY,,}" >> "$GITHUB_ENV"
 
+      - name: Read version from CHANGELOG.md
+        run: |
+          V=$(grep -m1 -oE '^## \[?v?[0-9]+\.[0-9]+' CHANGELOG.md | grep -oE '[0-9]+\.[0-9]+' || true)
+          if [[ ! "$V" =~ ^[0-9]+\.[0-9]$ ]]; then
+            echo "::error file=CHANGELOG.md::Newest heading must be '## MAJOR.MINOR' with a single-digit minor (e.g. '## 1.2'); got '${V:-nothing}'. After x.9 roll over to the next major (1.9 -> 2.0)."
+            exit 1
+          fi
+          echo "APP_VERSION=$V" >> "$GITHUB_ENV"
+          echo "Building version $V"
+
       - name: Log in to GHCR
         uses: docker/login-action@v3
         with:
@@ -37,9 +51,10 @@ jobs:
           images: ${{ env.IMAGE }}
           tags: |
             type=raw,value=latest,enable={{is_default_branch}}
+            type=raw,value=${{ env.APP_VERSION }},enable={{is_default_branch}}
             type=sha,format=short
-            type=semver,pattern={{version}}
-            type=semver,pattern={{major}}.{{minor}}
+          labels: |
+            org.opencontainers.image.version=${{ env.APP_VERSION }}
 
       # QEMU + Buildx enable the multi-arch build below.
       # If you only run amd64 (EPYC, N100), delete this step and drop the

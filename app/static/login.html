@@ -5,16 +5,13 @@
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <title>Spazcat IPAM — Sign in</title>
 <link rel="icon" type="image/svg+xml" href="/static/favicon.svg" />
+<link rel="stylesheet" href="/api/fonts.css" />
 <style>
-  @font-face {
-    font-family: "Ethnocentric";
-    src: url("/static/fonts/ethnocentric%20rg.otf") format("opentype");
-    font-weight: 400; font-style: normal; font-display: swap;
-  }
   :root {
     --bg: #0a0a0c; --panel: #141418; --border: #2a2a33; --text: #e6e6ea;
     --muted: #8a8a96; --accent: #8b5cf6; --accent-2: #f5a142; --danger: #ef4444;
     --mono: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+    --font-display: var(--mono);
   }
   * { box-sizing: border-box; }
   body {
@@ -27,7 +24,7 @@
     border-radius: 14px; padding: 28px 26px;
   }
   .brand {
-    font-family: "Ethnocentric", var(--mono); font-weight: 800; letter-spacing: 2px;
+    font-family: var(--font-display); font-weight: 800; letter-spacing: 2px;
     font-size: 20px; text-align: center; margin-bottom: 22px;
     background: linear-gradient(90deg, var(--accent), var(--accent-2));
     -webkit-background-clip: text; background-clip: text; color: transparent;
@@ -52,7 +49,7 @@
 </head>
 <body>
   <div class="card">
-    <div class="brand">SPAZCAT IPAM</div>
+    <div class="brand" id="brand">SPAZCAT IPAM</div>
     <label for="u">Username</label>
     <input id="u" autocomplete="username" autofocus />
     <label for="p">Password</label>
@@ -61,6 +58,14 @@
     <div class="err" id="err"></div>
   </div>
 <script>
+  // name + logo font come from Settings (public endpoint, no login needed)
+  fetch("/api/branding").then(r => r.json()).then(b => {
+    if (b.app_name) {
+      document.getElementById("brand").textContent = b.app_name;
+      document.title = b.app_name + " — Sign in";
+    }
+    if (b.font_logo) document.documentElement.style.setProperty("--font-display", b.font_logo);
+  }).catch(() => {});
   const err = document.getElementById("err");
   async function submit() {
     err.textContent = "";
