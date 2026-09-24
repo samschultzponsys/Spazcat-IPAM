@@ -78,7 +78,7 @@ DEFAULT_STORED = {
 
 # paths reachable without a session in every zone (login page and what it needs)
 PUBLIC_PATHS = {"/login", "/api/login", "/api/logout", "/api/auth/config", "/favicon.ico",
-                "/api/branding", "/api/fonts.css", "/healthz",
+                "/api/branding", "/api/fonts.css", "/healthz", "/manifest.webmanifest",
                 "/auth/oidc/login", "/auth/oidc/callback"}
 PUBLIC_PREFIXES = ("/static/", "/fonts/")
 

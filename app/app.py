@@ -855,6 +855,36 @@ def login_page():
     return send_from_directory(STATIC_DIR, "login.html")
 
 
+@app.route("/manifest.webmanifest")
+def manifest():
+    """Lets phones "Add to Home Screen" as a standalone app with your app name."""
+    db = get_db()
+    name = get_setting(db, "app_name", DEFAULT_APP_NAME) or DEFAULT_APP_NAME
+    body = {
+        "name": name, "short_name": name[:12], "start_url": "/", "scope": "/",
+        "display": "standalone", "background_color": "#0a0a0c", "theme_color": "#0a0a0c",
+        "icons": [
+            {"src": "/static/icon-192.png", "sizes": "192x192", "type": "image/png"},
+            {"src": "/static/icon-512.png", "sizes": "512x512", "type": "image/png"},
+            {"src": "/static/icon-maskable-512.png", "sizes": "512x512", "type": "image/png",
+             "purpose": "maskable"},
+        ],
+    }
+    return Response(json.dumps(body), mimetype="application/manifest+json")
+
+
+@app.after_request
+def _no_stale_pages(resp):
+    """Pages and API responses must never be served from a stale browser or
+    proxy cache - otherwise an updated image keeps showing the old UI.
+    Static assets (fonts, icons) may still be cached and revalidated."""
+    p = request.path
+    if p in ("/", "/login", "/api/fonts.css", "/manifest.webmanifest") or p.startswith("/api/"):
+        resp.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
+        resp.headers["Pragma"] = "no-cache"
+    return resp
+
+
 @app.route("/healthz")
 def healthz():
     """For Docker HEALTHCHECK / proxy health checks. Public, no data."""

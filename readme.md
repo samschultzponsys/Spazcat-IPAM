@@ -152,6 +152,19 @@ Each pool's **edit** dialog has a live preview of its header, plus:
 - The **▼ caret** on each header collapses the pool. This is remembered per
   browser, and a collapsed pool still accepts dropped devices.
 
+## On your phone
+
+The layout adapts on screens up to 640px wide:
+
+- **Toolbar:** Sync, + Pool and ⚙ stay visible. CSV export, theme, text size and sign
+  out are in the **⋯** menu.
+- **Device rows** stack as IP with badges and lock, then name, then MAC.
+- **Tap a device** to open it. Touch screens can't drag and drop, so change the
+  **Pool** field to move a device. **Delete** is in the same dialog.
+- **Dialogs** open as sheets from the bottom, and each has an **×** in the corner.
+- **Add to Home Screen** (Safari: Share → Add to Home Screen; Chrome: ⋮ → Add to
+  Home screen) opens the app full screen with its own icon and your app name.
+
 ## Duplicate IPs & stale data
 
 Controllers remember every client they have ever seen, along with the *last* IP it

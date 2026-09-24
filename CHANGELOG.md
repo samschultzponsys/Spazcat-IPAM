@@ -4,6 +4,30 @@ Versions are always `MAJOR.MINOR` with a single-digit minor: `1.0`, `1.1` … `1
 The newest `## x.y` heading below is the version the app reports and the tag the
 GitHub Action publishes the image under — bump it here and nowhere else.
 
+## 1.4 — 2026-09-24
+
+### Added
+- **Phone layout.** On screens up to 640px wide:
+  - a compact toolbar with a **⋯ menu** for CSV export, theme, text size and sign out
+  - device rows that stack (IP, badges and lock, then name, then MAC) so nothing
+    runs off the edge
+  - pool headers that wrap, with notes on their own line
+  - slightly smaller text overall (A−/A+ still adjust it)
+- **Tap a device to open it** on phones. Touch screens can't drag and drop, so use
+  the dialog's Pool field to move a device.
+- **Delete button** in the device dialog.
+- **× close button** on every dialog (changelog, settings, pool, device). It stays in
+  the corner while you scroll.
+- **Add to Home Screen:** a web app manifest and proper icons, so the app opens full
+  screen like a native app, using your app name.
+
+### Changed
+- On phones, dialogs open as sheets from the bottom and use one column. The
+  settings tabs scroll sideways, and the security table stacks.
+- Form fields use 16px text on phones, so iPhones no longer zoom in when you tap one.
+- Pages and API responses are sent with no-cache headers, so a browser or proxy
+  can't keep showing an old version after you update.
+
 ## 1.3 — 2026-09-24
 
 ### Added
