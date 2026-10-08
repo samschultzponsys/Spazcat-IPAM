@@ -14,7 +14,8 @@
 #   dated tags. GitHub doesn't allow backdating the release itself; its title
 #   and notes carry the original release date.
 # - Problems are reported as warnings; they never fail the image build.
-# - Already-released versions are skipped, so re-running is harmless.
+# - Already-released versions are only touched if their notes no longer match
+#   CHANGELOG.md (then the notes are updated), so re-running is harmless.
 # - DRY_RUN=1 prints what would happen without touching anything.
 set -uo pipefail
 CURRENT="$1"
@@ -34,10 +35,24 @@ while read -r sha; do
 done < <(git rev-list --first-parent --reverse "$HEAD_SHA")
 LAST[$CURRENT]="$HEAD_SHA"
 
+notes_for() {   # <version> <commit> -> notes file
+  local v="$1" sha="$2" img_tag="$1"
+  # 1.0 predates the x.y image tags - point at the image that actually exists
+  [ "$v" = "1.0" ] && img_tag="sha-${sha:0:7}"
+  "$HERE/release-notes.sh" "$v" "$IMAGE" | sed "s#\`$IMAGE:$v\`#\`$IMAGE:$img_tag\`#" > "notes-$v.md"
+}
+
 for v in $(grep -oE '^## \[?v?[0-9]+\.[0-9]+' CHANGELOG.md | grep -oE '[0-9]+\.[0-9]+' | sort -V -u); do
   tag="v$v"
   if [ -z "${DRY_RUN:-}" ] && gh release view "$tag" >/dev/null 2>&1; then
-    echo "$tag: release exists"
+    notes_for "$v" "${LAST[$v]:-$HEAD_SHA}"
+    if [ "$(gh release view "$tag" --json body -q .body)" != "$(cat "notes-$v.md")" ]; then
+      echo "$tag: release exists - notes differ from CHANGELOG.md, updating"
+      gh release edit "$tag" --notes-file "notes-$v.md" \
+        || echo "::warning::Could not update the notes of $tag"
+    else
+      echo "$tag: release exists and is up to date"
+    fi
     continue
   fi
   sha="${LAST[$v]:-}"
@@ -57,15 +72,17 @@ for v in $(grep -oE '^## \[?v?[0-9]+\.[0-9]+' CHANGELOG.md | grep -oE '[0-9]+\.[
       tag_args=(--target "$sha")
     fi
   fi
-  # 1.0 predates the x.y image tags - point at the image that actually exists
-  img_tag="$v"; [ "$v" = "1.0" ] && img_tag="sha-${sha:0:7}"
-  "$HERE/release-notes.sh" "$v" "$IMAGE" | sed "s#\`$IMAGE:$v\`#\`$IMAGE:$img_tag\`#" > "notes-$v.md"
+  notes_for "$v" "$sha"
   date_txt="$(grep -m1 -E "^## \[?v?${v//./\\.}" CHANGELOG.md | sed -E 's/^## [^ ]+[[:space:]]*[-–—(]*[[:space:]]*//; s/[)[:space:]]*$//')"
   latest="--latest=false"; [ "$v" = "$CURRENT" ] && latest="--latest"
   echo "$tag -> ${sha:0:7} (${date_txt:-no date}) $latest"
   if ! run gh release create "$tag" "${tag_args[@]}" --title "$tag${date_txt:+ — $date_txt}" \
       --notes-file "notes-$v.md" "$latest"; then
-    echo "::warning::Could not create release $tag (see above) - it will be retried on the next build"
+    if [ -z "${RELEASE_TOKEN:-}" ]; then
+      echo "::warning::$tag not created: GitHub doesn't let the built-in token tag a commit with an older workflow file. Add a RELEASE_TOKEN repository secret (see README) and re-run - it will be created then."
+    else
+      echo "::warning::Could not create release $tag (see above) - it will be retried on the next build"
+    fi
     failed=1
   fi
 done

@@ -10,7 +10,15 @@ RE="^## \\[?v?${V//./\\.}\\]?([^0-9]|$)"
 
 # the "## x.y — date" heading's date part, then everything up to the next "## "
 DATE=$( (grep -m1 -E "$RE" "$CHANGELOG" || true) | sed -E 's/^## \[?v?[0-9]+\.[0-9]+\]?[[:space:]]*[-–—(]*[[:space:]]*//; s/[)[:space:]]*$//')
-BODY=$(awk -v re="$RE" '$0 ~ re {f=1; next} f && /^## / {exit} f {print}' "$CHANGELOG" \
+# plain string compare of the heading's version - no regex escaping, so it
+# behaves the same in gawk, mawk and busybox awk
+BODY=$(awk -v want="$V" '
+  /^## / {
+    if (f) exit
+    h = $0; sub(/^## \[?v?/, "", h)
+    if (match(h, /^[0-9]+\.[0-9]+/) && substr(h, RSTART, RLENGTH) == want) { f = 1; next }
+  }
+  f { print }' "$CHANGELOG" \
        | sed -e '/./,$!d' | sed -e ':a' -e '/^\n*$/{$d;N;ba' -e '}')
 
 if [ -z "$BODY" ]; then
