@@ -32,8 +32,10 @@ services:
       # IPAM_AUTH_WAN: "oidc,local"
       # IPAM_TRUSTED_PROXIES: "172.16.0.0/12,10.0.0.0/8,192.168.0.0/16,127.0.0.1/32"
 
-      # --- Update check (on by default; reads this image's tag list on ghcr.io) ---
-      # IPAM_UPDATE_CHECK: "false"
+      # --- Update check (on by default; image + repo + GitHub token are set in
+      #     Settings -> Maintenance -> Update source; these override them) ---
+      # IPAM_UPDATE_CHECK: "false"               # turn update checks off entirely
+      # IPAM_GITHUB_TOKEN: "github_pat_..."      # private image/repo
     volumes:
       - ./data:/data
     ports:

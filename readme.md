@@ -20,9 +20,14 @@ Stack: Flask + SQLite + React (via CDN, no build step). Single container.
 
 ## Data & privacy
 
-**Everything lives in one local SQLite file: `/data/ipam.db`**, bind-mounted to
-`data/` next to the compose file. It holds your platform credentials, settings,
-last-sync time, the session secret, and all devices, pools and exclusions.
+**Everything lives in `data/`** next to the compose file, mounted at `/data`:
+
+- `ipam.db` (SQLite): devices, pools, exclusions, settings, platform credentials,
+  Security settings (users, tokens, SSO), the update-check GitHub token and the
+  session secret
+- `backups/`: automatic pre-upgrade copies of the DB
+- `branding/`: an uploaded icon
+- `fonts/`: drop-in fonts (optional)
 
 **Your data carries over between containers.** `data/` is a volume, so pulling a
 new image and recreating the container reuses it. Schema changes are additive
@@ -33,16 +38,18 @@ container, copy a backup over `data/ipam.db`, and run the older image tag.
 
 **The app only contacts:**
 - the controller or router you configure, during sync;
-- `ghcr.io`, every 6 hours, to read this image's tag list for the update dot. You
-  can turn this off in Settings → Maintenance, or hard-disable it with
-  `IPAM_UPDATE_CHECK=false`;
+- `ghcr.io` and `api.github.com`, every 6 hours, for the update check (the image's
+  tag list and the repo's `CHANGELOG.md`). You can turn this off in Settings →
+  Maintenance, or hard-disable it with `IPAM_UPDATE_CHECK=false`;
 - your OIDC provider, if you use SSO sign-in.
 
 There is no telemetry and no analytics. The browser loads React and Babel from
 unpkg. Credentials are stored server-side and never sent to the browser: secret
 fields always load blank.
 
-Credentials and the session secret are stored in the DB in plaintext, protected by
+Sign-in passwords are stored as scrypt hashes, and access tokens as SHA-256 hashes.
+Secrets the app has to *use*, such as controller API keys, the SSO client secret,
+the GitHub token and the session secret, are stored in the DB as-is, protected by
 filesystem permissions. That's standard for self-hosted tools, and the DB never
 leaves your box. Keep `data/` off any shared or synced location.
 
@@ -53,14 +60,17 @@ leaves your box. Keep `data/` off any shared or synced location.
 ├── CHANGELOG.md            # release notes + THE version number (newest "## x.y")
 ├── Dockerfile              # image recipe, built by the Action (not locally)
 ├── compose.yaml            # deploy: runs the prebuilt GHCR image
-├── .github/workflows/      # Action that builds + pushes to GHCR, tagged x.y
+├── .github/
+│   ├── workflows/          # Action: build + push to GHCR (:x.y), then GitHub Releases
+│   └── scripts/            # release-notes.sh, publish-releases.sh
 ├── .gitignore              # excludes data/, *.db
 └── app/
-    ├── app.py              # Flask app: API, sync, pools, fonts, version
+    ├── app.py              # Flask app: API, sync, pools, fonts, version + update check
     ├── auth.py             # sign-in: LAN/WAN zones, local, OIDC, tokens
+    ├── branding.py         # logo style, icon rendering + uploads
     ├── platforms.py        # one class per sync platform
     ├── requirements.txt
-    └── static/             # index.html, login.html, favicon.svg
+    └── static/             # index.html, login.html, brand.js, favicon.svg
         └── fonts/          # ← upload font files here (baked into the image)
 ```
 GitHub is the single source of truth: every push to `main` builds and publishes
@@ -77,8 +87,8 @@ docker compose up -d          # serves on port 20080
 ```
 
 To update: `docker compose pull && docker compose up -d`. Your `data/` folder is
-reused and backed up automatically. You can pin a version tag (`:1.2`) instead of
-`:latest`. To carry over an existing instance, copy its `ipam.db` into `./data/`
+reused and backed up automatically. You can pin a version tag (e.g. `:1.6`) instead
+of `:latest`. To carry over an existing instance, copy its `ipam.db` into `./data/`
 before first start.
 
 The container has a health check (`/healthz`) and runs on the Waitress production
@@ -241,10 +251,12 @@ a reverse-proxy cache can't keep serving the old icon.
 - In the app, the version shows in the **bottom-left corner**. Click it to open the
   changelog. The changelog also opens by itself the first time someone visits and
   again after an update (tracked per browser).
-- **Update dot**: every 6 hours the server reads this image's tags on GHCR. When a
-  higher `x.y` tag exists, a pulsing dot appears next to the version, and the
-  changelog dialog shows the pull command. Forks can point this at their own image
-  with `IPAM_UPDATE_IMAGE`.
+- **Update dot**: every 6 hours the server checks for a newer `x.y`. It reads the
+  image's tags on GHCR and the repo's `CHANGELOG.md` through the GitHub API. When
+  a newer version exists, a pulsing dot appears next to the version. The changelog
+  popup then shows that version's notes and the pull command. The image, repo and
+  an optional token are set in Settings → Maintenance → *Update source*, so forks
+  can point it at their own image.
 
 **Private image or repo:** in Settings → Maintenance → *Update source*, set the
 image (`ghcr.io/owner/name`), the GitHub repo (`owner/name`) and a GitHub token, then
@@ -268,11 +280,17 @@ section as its notes (see the repo's *Releases* page). Older versions without a
 release are backfilled the same way, so the Releases page always matches the
 changelog.
 
-GitHub won't let the build's own token create a dated tag on a commit that has an
-older workflow file. For those versions the release creates a plain tag on the same
-commit, and the title and notes carry the original date. To get tags dated to the
-original commits, add a repository secret `RELEASE_TOKEN` holding a token with
-workflow permission:
+If a changelog section is edited later, the next build updates that release's notes
+to match.
+
+GitHub won't let the build's own token tag a commit that has an older copy of the
+workflow file, so releases for versions shipped before the current workflow (v1.0–v1.5)
+can't be created with it. The build logs a warning and carries on. To create them, add
+a repository secret `RELEASE_TOKEN` (Settings → Secrets and variables → Actions)
+holding a token with workflow permission, then run the **build-image** workflow
+manually (Actions → build-image → Run workflow). Those tags are dated to their
+original commits. GitHub always shows a release's publish date as the day it was
+created, so each release's title and notes carry its original date.
 - classic token: `repo` and `workflow`
 - fine-grained token: *Contents* and *Workflows*, both read & write
 
@@ -281,10 +299,11 @@ workflow permission:
 ### First start
 
 Sign-in is **on by default**. The first time the container starts, it creates the
-user `admin` with a random password and prints it in a box in the log:
+user `admin` with a random password and prints it in a box in the log (use your
+container's name):
 
 ```bash
-docker logs spazcat-ipam 2>&1 | grep -A4 "ADMIN SIGN-IN"
+docker logs spazcat-ipam 2>&1 | grep -A6 "ADMIN SIGN-IN"
 ```
 ```
   ╔══════════════════════════════════════════════════════╗
@@ -415,14 +434,18 @@ which would count as LAN. The Security tab warns when it sees this.
 Sessions are signed, HttpOnly, SameSite=Lax cookies. Their length and the
 HTTPS-only flag are set in Settings → Security. `IPAM_SECRET_KEY` optionally sets
 the signing secret; otherwise a stable one is generated and stored in the DB.
-Before sign-in, only the login page, the app name, the logo font, the font files
-and `/healthz` are reachable.
+Before sign-in, only these are reachable:
+- the login page
+- the app name and logo style
+- the fonts
+- the icons and the home-screen app manifest
+- `/healthz`
 
 ## Other environment variables
 
 | var | purpose |
 |-----|---------|
-| `IPAM_DB` | DB path (default `/data/ipam.db`); backups and drop-in fonts sit next to it |
+| `IPAM_DB` | DB path (default `/data/ipam.db`); `backups/`, `branding/` and drop-in `fonts/` sit next to it |
 | `PORT` | listen port (default `20080`) |
 | `IPAM_THREADS` | web server threads (default 8) |
 | `IPAM_UPDATE_CHECK` | `false` to hard-disable the GHCR update check |
