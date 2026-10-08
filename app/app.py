@@ -77,10 +77,11 @@ def load_changelog():
         path = os.path.join(d, "CHANGELOG.md")
         if os.path.isfile(path):
             with open(path, encoding="utf-8") as fh:
-                text = fh.read()
-            break
-    else:
-        return []
+                return parse_changelog(fh.read())
+    return []
+
+
+def parse_changelog(text):
     entries, cur = [], None
     for line in text.splitlines():
         m = _VER_HEAD.match(line.strip())
@@ -119,7 +120,8 @@ def _env_bool(name, default=""):
 
 
 # Update check: which image to look at, and a hard off-switch
-UPDATE_IMAGE = os.environ.get("IPAM_UPDATE_IMAGE", "ghcr.io/samschultzponsys/spazcat-ipam").strip()
+DEFAULT_UPDATE_IMAGE = "ghcr.io/samschultzponsys/spazcat-ipam"
+DEFAULT_UPDATE_REPO = "samschultzponsys/Spazcat-IPAM"
 UPDATE_CHECK_ALLOWED = os.environ.get("IPAM_UPDATE_CHECK", "true").lower() not in ("0", "false", "no", "off")
 UPDATE_TTL = 6 * 3600
 
@@ -637,66 +639,151 @@ def data_fonts(fname):
 
 
 # ----------------------------------------------------------------------------
-# Update check (queries the published image's tags on GHCR)
+# Update check
 # ----------------------------------------------------------------------------
+# Two sources, both optional and both work for private projects with a GitHub
+# token (Settings -> Maintenance, or IPAM_GITHUB_TOKEN):
+#   1. the image's x.y tags on GHCR      (classic token with read:packages)
+#   2. CHANGELOG.md in the GitHub repo   (fine-grained "Contents: read", or classic repo)
+# The repo changelog also tells the user *what's in* the newer version, and is
+# the fallback when the registry can't be read. GHCR doesn't accept
+# fine-grained tokens (github_pat_...), so with one of those a private image is
+# tracked through the repo changelog alone - it's the same version source the
+# build tags the image from. The token is only ever sent to ghcr.io and
+# api.github.com - never to another registry.
 
-_update = {"latest": None, "checked_at": 0, "error": None}
+_update = {"latest": None, "checked_at": 0, "error": None, "source": None,
+           "registry_error": None, "repo_error": None, "remote_changelog": []}
 _update_lock = threading.Lock()
+GITHUB_API = "https://api.github.com"
+IMAGE_RE = re.compile(r"^[a-z0-9.-]+(?::\d+)?/[a-z0-9._/-]+$")
+REPO_RE = re.compile(r"^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$")
 
 
-def fetch_latest_version(image=UPDATE_IMAGE):
-    """Newest x.y tag of the image in its registry (anonymous pull token -
-    works for public GHCR packages)."""
+def update_config(db):
+    """(image, repo, token, locked-fields) with env overrides on top of the UI."""
+    locked = set()
+
+    def pick(env, key, default):
+        v = os.environ.get(env, "").strip()
+        if v:
+            locked.add(key)
+            return v
+        return (get_setting(db, key, "") or "").strip() or default
+
+    image = pick("IPAM_UPDATE_IMAGE", "update_image", DEFAULT_UPDATE_IMAGE).lower()
+    repo = pick("IPAM_UPDATE_REPO", "update_repo", DEFAULT_UPDATE_REPO)
+    token = pick("IPAM_GITHUB_TOKEN", "github_token", "")
+    return image, repo, token, locked
+
+
+def _http_error(what, r):
+    if r.status_code in (401, 403):
+        return (f"{what}: access denied (HTTP {r.status_code}) - private? add a GitHub token, "
+                "or check its scopes")
+    if r.status_code == 404:
+        return f"{what}: not found (HTTP 404) - check the name, or the token can't see it"
+    return f"{what}: HTTP {r.status_code}"
+
+
+def fetch_registry_versions(image, token):
+    """x.y tags of the image. Anonymous for public packages; with a GitHub
+    token (ghcr.io only) for private ones."""
     registry, _, repo = image.partition("/")
-    tok = requests.get(f"https://{registry}/token",
-                       params={"scope": f"repository:{repo}:pull"}, timeout=8)
-    tok.raise_for_status()
-    token = tok.json().get("token") or tok.json().get("access_token")
-    headers = {"Authorization": f"Bearer {token}"}
+    auth = None
+    if token and registry == "ghcr.io":
+        auth = (repo.split("/")[0], token)   # GHCR: any username + PAT
+    r = requests.get(f"https://{registry}/token",
+                     params={"scope": f"repository:{repo}:pull", "service": registry},
+                     auth=auth, timeout=8)
+    if r.status_code != 200:
+        raise RuntimeError(_http_error("Registry", r))
+    bearer = r.json().get("token") or r.json().get("access_token")
+    headers = {"Authorization": f"Bearer {bearer}"}
     url = f"https://{registry}/v2/{repo}/tags/list?n=1000"
     tags = []
     for _ in range(20):  # follow pagination, bounded
         r = requests.get(url, headers=headers, timeout=8)
-        r.raise_for_status()
+        if r.status_code != 200:
+            raise RuntimeError(_http_error("Registry", r))
         tags += r.json().get("tags") or []
-        link = r.headers.get("Link", "")
-        m = re.search(r"<([^>]+)>", link)
+        m = re.search(r"<([^>]+)>", r.headers.get("Link", ""))
         if not m:
             break
         nxt = m.group(1)
         url = nxt if nxt.startswith("http") else f"https://{registry}{nxt}"
-    versions = [t.lstrip("v") for t in tags if re.fullmatch(r"v?\d+\.\d+", t)]
-    return max(versions, key=version_key) if versions else None
+    return [t.lstrip("v") for t in tags if re.fullmatch(r"v?\d+\.\d+", t)]
+
+
+def fetch_repo_changelog(repo, token):
+    """CHANGELOG.md from the repo's default branch, parsed."""
+    headers = {"Accept": "application/vnd.github.raw+json", "X-GitHub-Api-Version": "2022-11-28"}
+    if token:
+        headers["Authorization"] = f"Bearer {token}"
+    r = requests.get(f"{GITHUB_API}/repos/{repo}/contents/CHANGELOG.md", headers=headers, timeout=8)
+    if r.status_code != 200:
+        raise RuntimeError(_http_error("Repo", r))
+    return parse_changelog(r.text)
 
 
 def update_check_enabled(db):
     return UPDATE_CHECK_ALLOWED and setting_bool(db, "update_check", True)
 
 
-def run_update_check():
-    try:
-        latest = fetch_latest_version()
-        err = None
-    except Exception as e:
-        latest, err = None, str(e)
+def run_update_check(db):
+    image, repo, token, _ = update_config(db)
+    versions, reg_err, repo_err, remote = [], None, None, []
+    fine_grained = token.startswith("github_pat_")
+    if fine_grained and image.startswith("ghcr.io/") and repo:
+        reg_err = None   # GHCR rejects fine-grained tokens; the repo changelog covers it
+    else:
+        try:
+            versions = fetch_registry_versions(image, token)
+        except Exception as e:
+            reg_err = str(e)
+    if repo:
+        try:
+            remote = fetch_repo_changelog(repo, token)
+        except Exception as e:
+            repo_err = str(e)
+    source = "registry" if versions else None
+    if not versions and remote:
+        # no readable image tags - fall back to the repo's newest changelog entry
+        versions, source = [e["version"] for e in remote], "repo"
+    latest = max(versions, key=version_key) if versions else None
+    newer = [e for e in remote if version_key(e["version"]) > version_key(VERSION)]
+    if fine_grained and not versions and not remote and not repo_err:
+        repo_err = "fine-grained tokens can't read ghcr.io - set the GitHub repo so versions come from its changelog"
+    err = None if latest else (reg_err or repo_err or "no x.y versions found")
     with _update_lock:
-        _update.update(latest=latest or _update["latest"], checked_at=now_ts(), error=err)
-    if err:
-        print(f"[update-check] {err}", flush=True)
+        _update.update(latest=latest, checked_at=now_ts(), error=err, source=source,
+                       registry_error=reg_err, repo_error=repo_err, remote_changelog=newer)
+    for e in (reg_err, repo_err):
+        if e:
+            print(f"[update-check] {e}", flush=True)
     return _update
 
 
 def update_status(db):
     enabled = update_check_enabled(db)
+    image, repo, token, locked = update_config(db)
     latest = _update["latest"] if enabled else None
     return {
         "enabled": enabled,
         "allowed": UPDATE_CHECK_ALLOWED,
-        "image": UPDATE_IMAGE,
+        "image": image,
+        "repo": repo,
+        "token_set": bool(token),
+        "token_kind": ("fine-grained" if token.startswith("github_pat_") else "classic") if token else None,
+        "locked": sorted(locked),
         "latest": latest,
+        "source": _update["source"] if enabled else None,
         "update_available": bool(latest and version_key(latest) > version_key(VERSION)),
         "checked_at": _update["checked_at"] if enabled else 0,
         "error": _update["error"] if enabled else None,
+        "registry_error": _update["registry_error"] if enabled else None,
+        "repo_error": _update["repo_error"] if enabled else None,
+        "changelog": _update["remote_changelog"] if enabled else [],
     }
 
 
@@ -942,8 +1029,38 @@ def api_version():
 def api_version_check():
     db = get_db()
     if update_check_enabled(db):
-        run_update_check()
+        run_update_check(db)
     return jsonify({"version": VERSION, "update": update_status(db)})
+
+
+@app.route("/api/update/settings", methods=["PUT"])
+def api_update_settings():
+    """Update source + GitHub token. The token is write-only: never returned."""
+    db = get_db()
+    data = request.get_json(force=True, silent=True) or {}
+    _, _, _, locked = update_config(db)
+    if "update_image" in data and "update_image" not in locked:
+        img = str(data["update_image"] or "").strip().lower()
+        if img and not IMAGE_RE.match(img):
+            return jsonify({"error": "Image must look like ghcr.io/owner/name"}), 400
+        set_setting(db, "update_image", img)
+    if "update_repo" in data and "update_repo" not in locked:
+        repo = str(data["update_repo"] or "").strip()
+        repo = re.sub(r"^(https?://)?github\.com/", "", repo).strip("/")
+        if repo.endswith(".git"):
+            repo = repo[:-4]
+        if repo and not REPO_RE.match(repo):
+            return jsonify({"error": "Repo must look like owner/name"}), 400
+        set_setting(db, "update_repo", repo)
+    if "github_token" not in locked:
+        if data.get("clear_github_token"):
+            set_setting(db, "github_token", "")
+        elif data.get("github_token"):
+            set_setting(db, "github_token", str(data["github_token"]).strip())
+    db.commit()
+    if update_check_enabled(db):
+        run_update_check(db)
+    return jsonify({"ok": True, "update": update_status(db)})
 
 
 # ----------------------------------------------------------------------------
@@ -1426,7 +1543,7 @@ def _auto_sync_loop():
             with closing(sqlite3.connect(DB_PATH, timeout=15)) as db:
                 db.row_factory = sqlite3.Row
                 if update_check_enabled(db) and now_ts() - _update["checked_at"] >= UPDATE_TTL:
-                    run_update_check()
+                    run_update_check(db)
                 interval = setting_int(db, "auto_sync_minutes", 0)
                 if interval <= 0 or get_setting(db, "platform", "unifi") == "none":
                     continue

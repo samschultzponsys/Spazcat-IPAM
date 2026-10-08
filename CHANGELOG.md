@@ -4,6 +4,29 @@ Versions are always `MAJOR.MINOR` with a single-digit minor: `1.0`, `1.1` … `1
 The newest `## x.y` heading below is the version the app reports and the tag the
 GitHub Action publishes the image under — bump it here and nowhere else.
 
+## 1.6 — 2026-10-08
+
+### Added
+- **Update checks for private images and repos.** Settings → Maintenance has a new
+  **Update source** section:
+  - the container image to watch
+  - the GitHub repo
+  - a **GitHub token**, stored server-side and never shown again
+  - a **Save & check now** button
+- **"What's new" before you update.** When a newer version exists, the update box
+  in the changelog popup shows that version's release notes, read from the repo's
+  `CHANGELOG.md`.
+- **Fine-grained tokens** (`github_pat_…`) work. GitHub's container registry doesn't
+  accept them, so the version is read from the repo's changelog instead, which is
+  the same place the build takes it from. Give the token *Contents: Read-only* on
+  the repo. Classic tokens (`ghp_…`) with `read:packages` read the image tags directly.
+- Environment overrides `IPAM_GITHUB_TOKEN`, `IPAM_UPDATE_REPO` and
+  `IPAM_UPDATE_IMAGE` lock the matching fields in the UI.
+
+### Security
+- The token is only ever sent to `ghcr.io` and `api.github.com`. It's never sent to
+  another registry, even if the image setting points elsewhere.
+
 ## 1.5 — 2026-09-24
 
 ### Added

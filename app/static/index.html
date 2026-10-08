@@ -135,6 +135,10 @@
     border-radius: 7px; padding: 5px 8px; font-family: inherit; font-size: 0.8em; min-width: 0;
   }
   .inline-add { display: flex; gap: 6px; margin-top: 8px; flex-wrap: wrap; }
+  .update-src { border: 1px solid var(--border); border-radius: 10px; padding: 12px; margin-bottom: 14px; }
+  .update-status { font-size: 0.72em; color: var(--muted); margin: 4px 0 10px; line-height: 1.5; }
+  .update-status .err-line { color: var(--danger); overflow-wrap: anywhere; }
+  .update-box .cl-upcoming { border-top: 1px solid var(--border); margin-top: 10px; padding-top: 10px; }
   .seg { display: inline-flex; border: 1px solid var(--border); border-radius: 9px; overflow: hidden; }
   .seg button { border: none; border-radius: 0; background: transparent; padding: 7px 12px; font-size: 0.78em; color: var(--muted); }
   .seg button + button { border-left: 1px solid var(--border); }
@@ -1300,7 +1304,8 @@ function SettingsModal({settings, excluded, onPreview, onClose, reload, flash, i
           <div className="field check"><label>
             <input type="checkbox" checked={!!f.update_check} disabled={!settings.update_check_allowed}
               onChange={e=>set("update_check",e.target.checked)} />
-            Check for new versions (reads the image's tag list from ghcr.io every 6 hours){!settings.update_check_allowed && " — disabled by IPAM_UPDATE_CHECK"}</label></div>
+            Check for new versions every 6 hours{!settings.update_check_allowed && " — disabled by IPAM_UPDATE_CHECK"}</label></div>
+          {settings.update_check_allowed && <UpdateSourceEditor flash={flash} />}
           <div className="excluded-block">
             <label>Excluded devices {excluded.length ? `(${excluded.length})` : ""}</label>
             {excluded.length === 0
@@ -1506,6 +1511,70 @@ function ZonePicker({zone, value, onChange, disabled, locked}) {
             disabled={disabled} onChange={()=>toggle(m)} /> {METHOD_LABELS[m]}</label>
         ))}
       </div>
+    </div>
+  );
+}
+
+function UpdateSourceEditor({flash}) {
+  const [u, setU] = useState(null);
+  const [f, setF] = useState(null);
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState(null);
+  const load = async () => {
+    const v = await api("/api/version");
+    if (!v.update) return;
+    setU(v.update);
+    setF({update_image: v.update.image, update_repo: v.update.repo, github_token: "", clear_github_token: false});
+  };
+  useEffect(() => { load(); }, []);
+  if (!u || !f) return null;
+  const locked = (k) => (u.locked || []).includes(k);
+  const env = (k, name) => locked(k) && <span className="tag env">set by {name}</span>;
+  const set = (k, v) => setF(prev => ({...prev, [k]: v}));
+  const save = async () => {
+    setBusy(true); setErr(null);
+    const r = await api("/api/update/settings", {method: "PUT", body: JSON.stringify(f)});
+    setBusy(false);
+    if (r.error) { setErr(r.error); return; }
+    setU(r.update);
+    setF({update_image: r.update.image, update_repo: r.update.repo, github_token: "", clear_github_token: false});
+    flash(r.update.latest ? `Update check OK — latest is v${r.update.latest}` : "Saved — check failed, see below");
+  };
+  const when = u.checked_at ? new Date(u.checked_at * 1000).toLocaleString() : "never";
+  return (
+    <div className="update-src">
+      <div className="section-label" style={{marginTop: 0}}>Update source</div>
+      <div className="field"><label>Container image {env("update_image", "IPAM_UPDATE_IMAGE")}</label>
+        <input value={f.update_image} disabled={locked("update_image")} placeholder="ghcr.io/owner/name"
+          onChange={e => set("update_image", e.target.value)} /></div>
+      <div className="field"><label>GitHub repo (for the changelog of new versions) {env("update_repo", "IPAM_UPDATE_REPO")}</label>
+        <input value={f.update_repo} disabled={locked("update_repo")} placeholder="owner/name"
+          onChange={e => set("update_repo", e.target.value)} /></div>
+      <div className="field"><label>
+        GitHub token (private image / repo) {env("github_token", "IPAM_GITHUB_TOKEN")}
+        {!locked("github_token") && (u.token_set && !f.clear_github_token
+          ? <span style={{color: "var(--ok)"}}> ✓ saved — leave blank to keep
+              <button type="button" className="link" onClick={() => set("clear_github_token", true)}>clear</button></span>
+          : f.clear_github_token ? <span style={{color: "var(--danger)"}}> will be cleared on save</span> : null)}
+        </label>
+        <input type="password" autoComplete="off" value={f.github_token} disabled={locked("github_token")}
+          placeholder={u.token_set ? "•••••••• (stored)" : "ghp_… or github_pat_…"}
+          onChange={e => set("github_token", e.target.value)} />
+        <div className="hint">
+          <b>Fine-grained token</b> (<code>github_pat_…</code>): give it <i>Contents: Read-only</i> on the repo above.
+          GitHub's container registry doesn't accept fine-grained tokens, so versions are read from the repo's
+          CHANGELOG.md (the same place the build takes the version from).<br/>
+          <b>Classic token</b> (<code>ghp_…</code>): <code>read:packages</code> for the image, plus <code>repo</code> for a private repo.<br/>
+          Only ever sent to ghcr.io and api.github.com, and never shown again.</div>
+      </div>
+      <div className="update-status">
+        <div>Last checked: {when}{u.latest ? <> · latest <b>v{u.latest}</b>{u.source === "repo" ? " (from repo changelog)" : ""}</> : null}
+          {u.token_kind ? ` · ${u.token_kind} token` : ""}</div>
+        {u.registry_error && <div className="err-line">Image: {u.registry_error}</div>}
+        {u.repo_error && <div className="err-line">Repo: {u.repo_error}</div>}
+        {err && <div className="err-line">{err}</div>}
+      </div>
+      <button className="primary" onClick={save} disabled={busy}>{busy ? "Checking…" : "Save & check now"}</button>
     </div>
   );
 }
@@ -1777,6 +1846,16 @@ function ChangelogModal({ver, setVer, onClose}) {
             <b>Update available: v{u.latest}</b><br/>
             Pull the new image to upgrade (your <code>data/</code> folder carries over and is backed up
             automatically): <code>docker compose pull &amp;&amp; docker compose up -d</code>
+            {(u.changelog || []).map(e => (
+              <div className="cl-entry cl-upcoming" key={"new-" + e.version}>
+                <div className="cl-head">
+                  <span className="cl-ver">v{e.version}</span>
+                  {e.date && <span className="cl-date">{e.date}</span>}
+                  <span className="tag cl-cur">NEW</span>
+                </div>
+                <MdBlock text={e.body} />
+              </div>
+            ))}
           </div>
         )}
         <div style={{fontSize:"0.7em", color:"var(--muted)", marginBottom:"12px", display:"flex", gap:"8px", alignItems:"center", flexWrap:"wrap"}}>

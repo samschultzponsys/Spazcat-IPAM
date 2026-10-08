@@ -246,6 +246,21 @@ a reverse-proxy cache can't keep serving the old icon.
   changelog dialog shows the pull command. Forks can point this at their own image
   with `IPAM_UPDATE_IMAGE`.
 
+**Private image or repo:** in Settings → Maintenance → *Update source*, set the
+image (`ghcr.io/owner/name`), the GitHub repo (`owner/name`) and a GitHub token, then
+click **Save & check now**.
+- **Fine-grained token** (`github_pat_…`): grant *Contents: Read-only* on the repo.
+  GitHub's container registry doesn't accept fine-grained tokens, so the version and
+  release notes are read from the repo's `CHANGELOG.md`, which is the same source the
+  build tags the image from.
+- **Classic token** (`ghp_…`): `read:packages` to read the image tags, plus `repo` if
+  the repo is private.
+
+The token is stored server-side and never sent back to the browser. It's only ever
+sent to `ghcr.io` and `api.github.com`. `IPAM_GITHUB_TOKEN`, `IPAM_UPDATE_REPO` and
+`IPAM_UPDATE_IMAGE` override (and lock) these fields. When an update exists, the
+changelog popup shows the new version's notes before you pull.
+
 **Cutting a release:** add a new `## x.y — YYYY-MM-DD` section at the top of
 `CHANGELOG.md` with the notes, and push to `main`.
 
@@ -399,7 +414,9 @@ and `/healthz` are reachable.
 | `PORT` | listen port (default `20080`) |
 | `IPAM_THREADS` | web server threads (default 8) |
 | `IPAM_UPDATE_CHECK` | `false` to hard-disable the GHCR update check |
-| `IPAM_UPDATE_IMAGE` | image to check for updates (default `ghcr.io/samschultzponsys/spazcat-ipam`) |
+| `IPAM_UPDATE_IMAGE` | image to check for updates (default `ghcr.io/samschultzponsys/spazcat-ipam`); also settable in the UI |
+| `IPAM_UPDATE_REPO` | GitHub repo whose `CHANGELOG.md` is read for new versions (default `samschultzponsys/Spazcat-IPAM`) |
+| `IPAM_GITHUB_TOKEN` | GitHub token for a private image/repo; also settable in Settings → Maintenance |
 
 ## Behavior notes
 
