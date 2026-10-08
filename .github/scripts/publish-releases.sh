@@ -6,11 +6,17 @@
 #   i.e. the commit its final :x.y image was built from (the current version:
 #   this build's commit). History before CHANGELOG.md existed counts as 1.0.
 # - Missing tags are created as annotated tags dated to that commit, so old
-#   versions show their real dates. GitHub doesn't allow backdating the
-#   release itself; its notes carry the original release date instead.
+#   versions show their real dates. GitHub refuses that push from the built-in
+#   GITHUB_TOKEN when the commit has an older workflow file ("without
+#   `workflows` permission"); then the Releases API creates a plain tag on the
+#   same commit instead. Add a RELEASE_TOKEN secret (classic PAT with repo +
+#   workflow, or fine-grained Contents + Workflows read/write) to always get
+#   dated tags. GitHub doesn't allow backdating the release itself; its title
+#   and notes carry the original release date.
+# - Problems are reported as warnings; they never fail the image build.
 # - Already-released versions are skipped, so re-running is harmless.
 # - DRY_RUN=1 prints what would happen without touching anything.
-set -euo pipefail
+set -uo pipefail
 CURRENT="$1"
 IMAGE="$2"
 HEAD_SHA="${GITHUB_SHA:-$(git rev-parse HEAD)}"
@@ -39,12 +45,17 @@ for v in $(grep -oE '^## \[?v?[0-9]+\.[0-9]+' CHANGELOG.md | grep -oE '[0-9]+\.[
     echo "$tag: no commit on main ships this version - skipped"
     continue
   fi
-  if ! git rev-parse -q --verify "refs/tags/$tag" >/dev/null; then
+  tag_args=(--verify-tag)
+  if ! git ls-remote --exit-code --tags origin "refs/tags/$tag" >/dev/null 2>&1; then
     date="$(git log -1 --format=%cI "$sha")"
     run env GIT_COMMITTER_DATE="$date" git -c user.name="github-actions[bot]" \
       -c user.email="41898282+github-actions[bot]@users.noreply.github.com" \
-      tag -a "$tag" "$sha" -m "Spazcat IPAM $tag"
-    run git push origin "refs/tags/$tag"
+      tag -f -a "$tag" "$sha" -m "Spazcat IPAM $tag"
+    if ! run git push origin "refs/tags/$tag"; then
+      echo "::notice::$tag: dated tag push refused - creating the tag through the release instead"
+      git tag -d "$tag" >/dev/null 2>&1 || true
+      tag_args=(--target "$sha")
+    fi
   fi
   # 1.0 predates the x.y image tags - point at the image that actually exists
   img_tag="$v"; [ "$v" = "1.0" ] && img_tag="sha-${sha:0:7}"
@@ -52,6 +63,11 @@ for v in $(grep -oE '^## \[?v?[0-9]+\.[0-9]+' CHANGELOG.md | grep -oE '[0-9]+\.[
   date_txt="$(grep -m1 -E "^## \[?v?${v//./\\.}" CHANGELOG.md | sed -E 's/^## [^ ]+[[:space:]]*[-–—(]*[[:space:]]*//; s/[)[:space:]]*$//')"
   latest="--latest=false"; [ "$v" = "$CURRENT" ] && latest="--latest"
   echo "$tag -> ${sha:0:7} (${date_txt:-no date}) $latest"
-  run gh release create "$tag" --verify-tag --title "$tag${date_txt:+ — $date_txt}" \
-    --notes-file "notes-$v.md" "$latest"
+  if ! run gh release create "$tag" "${tag_args[@]}" --title "$tag${date_txt:+ — $date_txt}" \
+      --notes-file "notes-$v.md" "$latest"; then
+    echo "::warning::Could not create release $tag (see above) - it will be retried on the next build"
+    failed=1
+  fi
 done
+[ -n "${failed:-}" ] && echo "::warning::Some releases were not created"
+exit 0

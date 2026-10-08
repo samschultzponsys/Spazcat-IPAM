@@ -268,6 +268,14 @@ section as its notes (see the repo's *Releases* page). Older versions without a
 release are backfilled the same way, so the Releases page always matches the
 changelog.
 
+GitHub won't let the build's own token create a dated tag on a commit that has an
+older workflow file. For those versions the release creates a plain tag on the same
+commit, and the title and notes carry the original date. To get tags dated to the
+original commits, add a repository secret `RELEASE_TOKEN` holding a token with
+workflow permission:
+- classic token: `repo` and `workflow`
+- fine-grained token: *Contents* and *Workflows*, both read & write
+
 ## Authentication
 
 ### First start

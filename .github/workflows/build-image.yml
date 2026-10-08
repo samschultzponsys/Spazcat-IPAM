@@ -87,6 +87,14 @@ jobs:
       - name: Publish GitHub Releases
         if: github.ref == 'refs/heads/main'
         env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # optional RELEASE_TOKEN secret (PAT with workflow permission) lets
+          # old versions get tags dated to their original commit
+          GH_TOKEN: ${{ secrets.RELEASE_TOKEN || secrets.GITHUB_TOKEN }}
+          RELEASE_TOKEN: ${{ secrets.RELEASE_TOKEN }}
           GH_REPO: ${{ github.repository }}
-        run: .github/scripts/publish-releases.sh "$APP_VERSION" "$IMAGE"
+        run: |
+          if [ -n "$RELEASE_TOKEN" ]; then
+            git config --unset-all http.https://github.com/.extraheader || true
+            git remote set-url origin "https://x-access-token:${RELEASE_TOKEN}@github.com/${GH_REPO}.git"
+          fi
+          .github/scripts/publish-releases.sh "$APP_VERSION" "$IMAGE"
