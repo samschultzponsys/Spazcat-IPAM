@@ -262,7 +262,11 @@ sent to `ghcr.io` and `api.github.com`. `IPAM_GITHUB_TOKEN`, `IPAM_UPDATE_REPO` 
 changelog popup shows the new version's notes before you pull.
 
 **Cutting a release:** add a new `## x.y — YYYY-MM-DD` section at the top of
-`CHANGELOG.md` with the notes, and push to `main`.
+`CHANGELOG.md` with the notes, and push to `main`. The build publishes the
+`:x.y` image and then a **GitHub Release** `vx.y`, tagged on that commit, with that
+section as its notes (see the repo's *Releases* page). Older versions without a
+release are backfilled the same way, so the Releases page always matches the
+changelog.
 
 ## Authentication
 
