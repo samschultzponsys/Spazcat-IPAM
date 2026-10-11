@@ -4,8 +4,8 @@ A lightweight, self-hosted IP Address Management tool. Your controller or router
 (UniFi, TP-Link Omada, Alta Labs, OpenWrt, MikroTik, OPNsense, Pi-hole, AdGuard Home,
 Technitium) stays the DHCP source of truth. This is the planning and visualization
 layer on top of it: color-coded pools, automatic sorting by subnet, drag-and-drop
-device assignment, duplicate-IP detection, and CSV export so you're never locked to
-one DHCP server.
+device assignment, duplicate-IP detection, a two-way GitHub Issues panel, and CSV
+export so you're never locked to one DHCP server.
 
 Stack: Flask + SQLite + React (via CDN, no build step). Single container.
 
@@ -23,8 +23,8 @@ Stack: Flask + SQLite + React (via CDN, no build step). Single container.
 **Everything lives in `data/`** next to the compose file, mounted at `/data`:
 
 - `ipam.db` (SQLite): devices, pools, exclusions, settings, platform credentials,
-  Security settings (users, tokens, SSO), the update-check GitHub token and the
-  session secret
+  Security settings (users, tokens, SSO), the GitHub token, a local copy of the
+  repo's GitHub issues (plus any changes not sent yet) and the session secret
 - `backups/`: automatic pre-upgrade copies of the DB
 - `branding/`: an uploaded icon
 - `fonts/`: drop-in fonts (optional)
@@ -41,6 +41,9 @@ container, copy a backup over `data/ipam.db`, and run the older image tag.
 - `ghcr.io` and `api.github.com`, every 6 hours, for the update check (the image's
   tag list and the repo's `CHANGELOG.md`). You can turn this off in Settings →
   Maintenance, or hard-disable it with `IPAM_UPDATE_CHECK=false`;
+- `api.github.com` for the Issues panel, if it's on: every 10 minutes by default,
+  when the panel opens, and when you post something. Hard-disable it with
+  `IPAM_ISSUES=false`;
 - your OIDC provider, if you use SSO sign-in.
 
 There is no telemetry and no analytics. The browser loads React and Babel from
@@ -68,6 +71,7 @@ leaves your box. Keep `data/` off any shared or synced location.
     ├── app.py              # Flask app: API, sync, pools, fonts, version + update check
     ├── auth.py             # sign-in: LAN/WAN zones, local, OIDC, tokens
     ├── branding.py         # logo style, icon rendering + uploads
+    ├── issues.py           # GitHub Issues: two-way sync, outbox, Issues panel API
     ├── platforms.py        # one class per sync platform
     ├── requirements.txt
     └── static/             # index.html, login.html, brand.js, favicon.svg
@@ -87,7 +91,7 @@ docker compose up -d          # serves on port 20080
 ```
 
 To update: `docker compose pull && docker compose up -d`. Your `data/` folder is
-reused and backed up automatically. You can pin a version tag (e.g. `:1.6`) instead
+reused and backed up automatically. You can pin a version tag (e.g. `:1.7`) instead
 of `:latest`. To carry over an existing instance, copy its `ipam.db` into `./data/`
 before first start.
 
@@ -166,8 +170,8 @@ Each pool's **edit** dialog has a live preview of its header, plus:
 
 The layout adapts on screens up to 640px wide:
 
-- **Toolbar:** Sync, + Pool and ⚙ stay visible. CSV export, theme, text size and sign
-  out are in the **⋯** menu.
+- **Toolbar:** Sync, + Pool and ⚙ stay visible. Issues, CSV export, theme, text size
+  and sign out are in the **⋯** menu.
 - **Device rows** stack as IP with badges and lock, then name, then MAC.
 - **Tap a device** to open it. Touch screens can't drag and drop, so change the
   **Pool** field to move a device. **Delete** is in the same dialog.
@@ -293,6 +297,51 @@ original commits. GitHub always shows a release's publish date as the day it was
 created, so each release's title and notes carry its original date.
 - classic token: `repo` and `workflow`
 - fine-grained token: *Contents* and *Workflows*, both read & write
+
+## GitHub issues
+
+**◎ Issues** in the toolbar (the ⋯ menu on phones) opens the repo's GitHub issues
+inside the app. The number on the button is the open-issue count, and a dot
+appears when something has changed since you last looked.
+
+- **Browse:** Open / Closed / All, search by title, `#number` or author, and filter
+  by label. Issues and comments show as GitHub renders them, with links opening in
+  a new tab.
+- **Open an issue:** **+ New issue**, then a title, a description with a Markdown
+  **Preview**, and labels. Tick *Add app info* to append the version, sync platform
+  and browser, which helps with bug reports. The draft is kept if you close the
+  dialog.
+- **Work on an issue:** comment, close it as done or *not planned*, reopen it, edit
+  the title, description or labels, and edit or delete your own comments.
+
+**How the sync works.** The app keeps a copy of the issues in `ipam.db`, so the
+panel opens instantly and still works when GitHub is down.
+- Anything you do in the app is sent to GitHub right away.
+- Changes on GitHub are pulled every 10 minutes (Settings → Maintenance → *GitHub
+  issues*; 0 = only when the panel opens) and whenever you open the panel.
+- Comments deleted on GitHub are caught too. **Full resync** rebuilds the local copy
+  from scratch, which also drops issues that were deleted or moved.
+
+If GitHub can't be reached, or refuses a change, the change is kept and marked
+**⏳ not sent**. A box at the top of the panel shows the reason. Waiting changes are
+sent in order on every sync, and each one has **Retry** and **Discard**.
+
+**Setup.** The panel uses the GitHub token from *Update source* (see above). If
+update checks are hard-disabled, the token field appears in the Issues section
+instead. The repo defaults to the update-source repo, and you can point it at a
+different one.
+- **Fine-grained token:** add *Issues: Read and write* on the repo, alongside
+  *Contents: Read-only* for update checks.
+- **Classic token:** needs `repo`.
+
+Without a token, a public repo can be read but nothing can be sent. A missing
+permission is named in the error, for example "give it Issues: Read and write on
+the repo".
+
+Everything is posted as the token's GitHub account. With *Sign issues and comments*
+on (the default), each post ends with a small "Sent from <app name> by <user>" line,
+so it's clear who wrote it. Anyone who can sign in to the app can post through the
+token, so give the token access only to the repo you want.
 
 ## Authentication
 
@@ -451,7 +500,9 @@ Before sign-in, only these are reachable:
 | `IPAM_UPDATE_CHECK` | `false` to hard-disable the GHCR update check |
 | `IPAM_UPDATE_IMAGE` | image to check for updates (default `ghcr.io/samschultzponsys/spazcat-ipam`); also settable in the UI |
 | `IPAM_UPDATE_REPO` | GitHub repo whose `CHANGELOG.md` is read for new versions (default `samschultzponsys/Spazcat-IPAM`) |
-| `IPAM_GITHUB_TOKEN` | GitHub token for a private image/repo; also settable in Settings → Maintenance |
+| `IPAM_GITHUB_TOKEN` | GitHub token for a private image/repo and the Issues panel; also settable in Settings → Maintenance |
+| `IPAM_ISSUES_REPO` | repo for the Issues panel (default: the update-source repo); also settable in the UI |
+| `IPAM_ISSUES` | `false` to hard-disable the GitHub Issues panel and its sync |
 
 ## Behavior notes
 

@@ -5,6 +5,7 @@ Spazcat IPAM - a lightweight IP allocation / device tracking tool.
 - Pulls clients from a network controller / router (UniFi, TP-Link Omada,
   Alta Labs Route10, OpenWrt, MikroTik, OPNsense, Pi-hole, AdGuard Home,
   Technitium - see platforms.py).
+- Optional two-way sync with the GitHub Issues of a repo (issues.py).
 - Organizes them into color-coded pools you define in the UI; devices whose IP
   falls inside a pool's subnet can be sorted into it automatically.
 - New/unknown devices with no matching pool land in the gray "Unallocated" pool.
@@ -37,6 +38,7 @@ from flask import Flask, g, jsonify, request, Response, send_from_directory, red
 
 import auth
 import branding
+import issues
 
 from platforms import (
     PlatformError, UniFiError, PLATFORMS, all_fields, make_platform, normalize_mac,
@@ -139,6 +141,10 @@ app.secret_key = secrets.token_hex(32)
 auth.init_app(app)
 branding.register(app, lambda: get_db(), lambda db, k, d=None: get_setting(db, k, d),
                   lambda db, k, v: set_setting(db, k, v), BRANDING_DIR)
+issues.register(app, lambda: get_db(), lambda db, k, d=None: get_setting(db, k, d),
+                lambda db, k, v: set_setting(db, k, v),
+                lambda db: (lambda c: (c[1], c[2], "github_token" in c[3]))(update_config(db)),
+                lambda db: get_setting(db, "app_name", DEFAULT_APP_NAME) or DEFAULT_APP_NAME)
 
 
 def configure_secret():
@@ -302,6 +308,9 @@ def init_db():
             db.execute("ALTER TABLE pools ADD COLUMN style TEXT NOT NULL DEFAULT '{}'")
         # 1.2: WAL lets the web server (now multi-threaded) read while a sync writes
         db.execute("PRAGMA journal_mode=WAL")
+        # 1.7: local copy of the repo's GitHub issues + the outbox of unsent
+        # changes (after the WAL switch, which can't happen inside a transaction)
+        issues.init_db(db)
 
         # 1.1: auto-sync became value + unit; derive them from the old minutes
         have = {r[0] for r in db.execute("SELECT key FROM settings").fetchall()}
@@ -921,6 +930,7 @@ def serialize_state(db):
         "update_check_allowed": UPDATE_CHECK_ALLOWED,
         "auth": auth.request_status(),
         "auth_enabled": auth.request_status()["required"],
+        "issues": issues.summary(db),
         "version": VERSION,
     }
     excluded = [dict(r) for r in db.execute(
@@ -1536,7 +1546,8 @@ def export_csv():
 def _auto_sync_loop():
     """Background timer: every 30s, check the auto-sync interval and run a sync
     if enough time has elapsed since the last one; refresh the update check
-    every UPDATE_TTL. Its own connection."""
+    every UPDATE_TTL and the GitHub issues on their own interval. Its own
+    connection."""
     while True:
         time.sleep(30)
         try:
@@ -1544,6 +1555,7 @@ def _auto_sync_loop():
                 db.row_factory = sqlite3.Row
                 if update_check_enabled(db) and now_ts() - _update["checked_at"] >= UPDATE_TTL:
                     run_update_check(db)
+                issues.maybe_sync(db)
                 interval = setting_int(db, "auto_sync_minutes", 0)
                 if interval <= 0 or get_setting(db, "platform", "unifi") == "none":
                     continue

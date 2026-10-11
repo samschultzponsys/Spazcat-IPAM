@@ -35,7 +35,11 @@ services:
       # --- Update check (on by default; image + repo + GitHub token are set in
       #     Settings -> Maintenance -> Update source; these override them) ---
       # IPAM_UPDATE_CHECK: "false"               # turn update checks off entirely
-      # IPAM_GITHUB_TOKEN: "github_pat_..."      # private image/repo
+      # IPAM_GITHUB_TOKEN: "github_pat_..."      # private image/repo + Issues panel
+
+      # --- GitHub Issues panel (Settings -> Maintenance -> GitHub issues) ---
+      # IPAM_ISSUES: "false"                     # turn the Issues panel + sync off entirely
+      # IPAM_ISSUES_REPO: "owner/name"           # repo, if not the update-source one
     volumes:
       - ./data:/data
     ports:

@@ -2,7 +2,8 @@
 
 Self-hosted IP address manager layered on top of DHCP controllers. It pulls
 clients from a controller (UniFi, Omada, OPNsense, Pi-hole, AdGuard Home, …),
-lets you sort them into color-coded pools, and flags duplicate IPs. It ships
+lets you sort them into color-coded pools, flags duplicate IPs, and has a two-way
+GitHub Issues panel for the app's own repo. It ships
 as one Docker image: `ghcr.io/samschultzponsys/spazcat-ipam` (amd64 and arm64),
 port **20080**. Open items are in `NOTES.md`.
 
@@ -18,6 +19,8 @@ port **20080**. Open items are in `NOTES.md`.
   oidc and token, the session gate (`before_request`), users, tokens, OIDC through
   Authlib with PKCE, and rate limiting.
 - `app/branding.py`: logo and icon styles, SVG and Pillow PNG icon rendering, uploads.
+- `app/issues.py`: GitHub Issues. It keeps a local copy (`gh_issues`, `gh_comments`)
+  plus an outbox (`gh_outbox`) of unsent changes, and serves the `/api/issues*` routes.
 - `app/platforms.py`: one `Platform` subclass per controller. Each `FIELDS` key
   doubles as a settings key, and secret fields are write-only.
 - `app/static/`: `index.html` (the whole UI), `login.html`, `brand.js` (shared
@@ -45,6 +48,10 @@ port **20080**. Open items are in `NOTES.md`.
   - Playwright with Chromium at `/opt/pw-browsers`. In the sandbox unpkg is
     blocked, so route `unpkg.com` requests to locally `npm pack`ed React/Babel files.
   - Dismiss the changelog popup first; it auto-opens and blocks clicks.
+  - Issues: set `issues.GITHUB_API` to a fake API from a wrapper script. Don't add
+    an env var for it; the token must only go to api.github.com.
+  - Test schema changes on an *existing* DB too: `PRAGMA journal_mode=WAL` fails
+    inside an open transaction.
 - Locally, Python is 3.11, but the image runs 3.12. Avoid 3.12-only syntax, such
   as backslashes inside f-string expressions.
 - Check mobile at ≤640px. The breakpoint is the `@media (max-width:640px)` block
@@ -99,10 +106,8 @@ port **20080**. Open items are in `NOTES.md`.
   - A save that would lock the editor out returns **409** and needs confirming.
 - **Client IP:** `X-Forwarded-For` is honored only from `trusted_proxies` and read
   right to left. Otherwise a WAN client could spoof a LAN address.
-- **OIDC:**
-  - auto-redirect is decided **server-side**, not in browser storage
-  - `/login?manual=1` is the escape hatch
-  - not yet tested against a real IdP
+- **OIDC:** auto-redirect is decided **server-side**, not in browser storage;
+  `/login?manual=1` is the escape hatch.
 - **Duplicate IPs** count only *active claims*: online, reserved, locked or manual.
   Old rows get a `STALE` tag instead.
 - **UniFi:**
@@ -111,12 +116,9 @@ port **20080**. Open items are in `NOTES.md`.
   - `last_seen` comes from the controller, never from the sync time
 - **The auto-sync thread must start exactly once.** Waitress is single-process; keep
   it that way, or add a lock before scaling out.
-- **Fonts:**
-  - files in `app/static/fonts` or `/data/fonts` are served through generated
-    `/api/fonts.css` as `ipamf-<slug>`
-  - the logo defaults to a non-italic "ethnocentric" file
-  - **never bind-mount over `/app/static/fonts`.** That hid the baked-in fonts for
-    the user once.
+- **Fonts:** files in `app/static/fonts` or `/data/fonts` are served via generated
+  `/api/fonts.css` as `ipamf-<slug>`; the logo defaults to a non-italic "ethnocentric"
+  file. **Never bind-mount over `/app/static/fonts`** (it hid the fonts once).
 - **Caching:** the user runs Nginx Proxy Manager with asset caching.
   - Pages, the API, `fonts.css` and the manifest are sent as no-cache.
   - Icons are cache-busted with `?v=<icon_version>`; bump it on any icon change.
@@ -135,12 +137,20 @@ port **20080**. Open items are in `NOTES.md`.
   - The Action's `GITHUB_TOKEN` can't create tags on commits whose workflow file
     differs, which blocks the backfill. That needs the `RELEASE_TOKEN` secret (see
     NOTES.md).
+- **Issues sync:**
+  - **Push:** each change is enqueued, applied locally, then sent at once. Local-only
+    rows have a negative id (`-outbox_id`) until GitHub returns the real one.
+  - **Failures:** network, 401 and 5xx stop the flush; other errors only hold back
+    later items for the same issue. Retried every sync until discarded.
+  - **Pull:** uses `since` with a 2-minute overlap and never overwrites `pending=1`
+    rows. A comment-count mismatch triggers a full re-read of that issue, which is
+    how deletions are caught.
+  - **Token:** it's the update-check token, so it also needs *Issues: Read and write*.
+  - **HTML:** GitHub's rendered HTML goes through `issues.clean_html` before
+    `dangerouslySetInnerHTML`. Keep both layers.
 - **awk:** `awk -v re=…` processes backslash escapes under gawk, so
   `release-notes.sh` uses a plain string compare. Keep it portable across gawk
   and mawk.
-- **Sync rules:**
-  - grace fallback moves offline, non-reserved devices to Unallocated after the
-    grace period
-  - prune (off by default) skips locked, reserved, manual and noted devices
-  - auto-pool picks the most specific CIDR and skips stale devices
-  - locked devices never move
+- **Sync rules:** grace fallback moves offline, non-reserved devices to Unallocated;
+  prune (off by default) skips locked, reserved, manual and noted devices; auto-pool
+  picks the most specific CIDR and skips stale devices; locked devices never move.

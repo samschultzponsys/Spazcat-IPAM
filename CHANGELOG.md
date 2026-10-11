@@ -4,6 +4,39 @@ Versions are always `MAJOR.MINOR` with a single-digit minor: `1.0`, `1.1` … `1
 The newest `## x.y` heading below is the version the app reports and the tag the
 GitHub Action publishes the image under — bump it here and nowhere else.
 
+## 1.7 — 2026-10-11
+
+### Added
+- **GitHub Issues panel** (◎ Issues in the toolbar, or the ⋯ menu on phones). It
+  syncs both ways with the repo's GitHub issues:
+  - browse open, closed or all issues, with search and a label filter
+  - read each issue and its comments as GitHub renders them
+  - **open new issues** with labels, a Markdown preview and an optional "app info"
+    block (version, sync platform, browser) for bug reports. Drafts are kept if you
+    close the dialog.
+  - comment, edit the title, description and labels, close (done or not planned)
+    and reopen
+  - edit and delete your own comments
+- **Two-way sync.** Changes made in the app go to GitHub straight away. Changes made
+  on GitHub are pulled every 10 minutes (adjustable) and whenever the panel opens,
+  including comments deleted there.
+- **Nothing gets lost.** If GitHub can't be reached, or refuses a change, the change
+  is kept and marked *not sent*. It's retried on every sync, and you can retry or
+  discard it.
+- The Issues button shows the number of open issues, plus a dot when something
+  changed since you last looked.
+- Settings → Maintenance → **GitHub issues**: turn the panel on or off, pick the repo
+  (it defaults to the update-source repo), set the sync interval, and run a full
+  resync.
+- Posts can be signed "Sent from <app name> by <user>". Everything is posted as the
+  token's GitHub account, so this shows who actually wrote it. It's on by default.
+
+### Changed
+- The GitHub token from 1.6 is reused. For a fine-grained token, add
+  *Issues: Read and write* on the repo. A classic token needs `repo`.
+- New environment variables: `IPAM_ISSUES_REPO` overrides (and locks) the repo, and
+  `IPAM_ISSUES=false` turns the feature off entirely.
+
 ## 1.6 — 2026-10-08
 
 ### Added

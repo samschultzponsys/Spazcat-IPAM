@@ -352,6 +352,93 @@
   .cl-body p { margin: 4px 0; color: var(--muted); }
   .cl-body code { background: var(--panel-2); padding: 0 4px; border-radius: 4px; }
 
+  /* GitHub issues */
+  .modal.xwide { width: 860px; }
+  .count-badge { margin-left: 6px; background: var(--accent); color: #fff; border-radius: 999px; padding: 0 7px; font-size: 0.85em; }
+  .new-dot { display: inline-block; width: 7px; height: 7px; border-radius: 50%; background: var(--accent-2); margin-left: 5px; vertical-align: middle; }
+  .muted { color: var(--muted); }
+  .gh-repo { font-family: var(--font-body); font-size: 0.55em; letter-spacing: 0; margin-left: 10px; font-weight: 400; }
+  .issues-status { font-size: 0.7em; color: var(--muted); margin: -6px 0 12px; display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+  .issues-status .err-line, .err-line { color: var(--danger); overflow-wrap: anywhere; }
+  .small-err { font-size: 0.7em; margin-bottom: 8px; }
+  button.mini-btn { padding: 3px 9px; font-size: 0.72em; }
+  .issues-bar { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; margin-bottom: 10px; }
+  .issues-bar .search { flex: 1; min-width: 160px; padding: 8px 11px; }
+  .mini-select { background: var(--panel-2); color: var(--text); border: 1px solid var(--border); border-radius: 8px; padding: 7px 8px; font-family: inherit; font-size: 0.78em; max-width: 160px; }
+  .issue-row { display: flex; gap: 10px; padding: 10px 8px; border-bottom: 1px solid var(--border); cursor: pointer; align-items: flex-start; border-radius: 6px; }
+  .issue-row:hover { background: var(--panel-2); }
+  .issue-icon { flex: none; width: 1.2em; text-align: center; font-size: 0.9em; line-height: 1.4; }
+  .issue-icon.open { color: var(--ok); }
+  .issue-icon.closed { color: #a371f7; }
+  .issue-icon.not_planned { color: var(--muted); }
+  .issue-main { flex: 1; min-width: 0; }
+  .issue-title-line { font-size: 0.84em; font-weight: 700; overflow-wrap: anywhere; line-height: 1.45; }
+  .issue-sub { color: var(--muted); font-size: 0.68em; margin-top: 3px; display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
+  .issue-cc { color: var(--muted); font-size: 0.7em; flex: none; }
+  .gh-label { display: inline-flex; align-items: center; gap: 4px; font-size: 0.66rem; font-weight: 600; padding: 1px 8px; border-radius: 999px; border: 1px solid var(--border); margin: 0 4px 3px 0; vertical-align: middle; color: var(--text); white-space: nowrap; }
+  .gh-label-dot { width: 7px; height: 7px; border-radius: 50%; flex: none; }
+  .gh-label.pick { cursor: pointer; font-size: 0.74rem; padding: 3px 10px; }
+  .gh-label.off { opacity: 0.55; }
+  .label-pick { margin: 4px 0 8px; }
+  .state-badge { display: inline-block; padding: 2px 10px; border-radius: 999px; font-size: 0.95em; font-weight: 700; color: #fff; background: #1f883d; }
+  .state-badge.closed { background: #8250df; }
+  .state-badge.not_planned { background: #6e7781; }
+  .tag.pend { color: var(--accent-2); border-color: var(--accent-2); }
+  .empty-issues { color: var(--muted); font-size: 0.8em; padding: 24px 8px; text-align: center; }
+  .outbox { border: 1px solid var(--accent-2); border-radius: 10px; padding: 8px 12px; margin-bottom: 12px; font-size: 0.74em; }
+  .outbox-row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; padding: 4px 0; }
+  .outbox-row .what { flex: 1; min-width: 0; overflow-wrap: anywhere; }
+  .outbox-row button { padding: 3px 9px; }
+  .issue-view h4 { font-family: var(--font-head); margin: 10px 0 6px; font-size: 1.05em; overflow-wrap: anywhere; }
+  .issue-meta { font-size: 0.72em; color: var(--muted); display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin-bottom: 8px; }
+  .issue-meta b { color: var(--text); }
+  .issue-labels { margin-bottom: 12px; }
+  button.link.back { padding: 0; font-size: 0.78em; text-decoration: none; }
+  button.link.small { font-size: 0.72em; }
+  button.link.danger-link { color: var(--danger); }
+  .gh-post { border: 1px solid var(--border); border-radius: 10px; margin-bottom: 12px; overflow: hidden; }
+  .gh-post-head { background: var(--panel-2); padding: 6px 12px; font-size: 0.72em; color: var(--muted); display: flex; gap: 8px; flex-wrap: wrap; align-items: center; border-bottom: 1px solid var(--border); }
+  .gh-post-head b { color: var(--text); }
+  .gh-post-head .spacer { flex: 1; }
+  .gh-post > .gh-md, .gh-edit { padding: 10px 12px; }
+  .gh-edit .md-editor { margin-bottom: 8px; }
+  .right-btns { display: flex; gap: 8px; justify-content: flex-end; }
+  .gh-reply { margin-top: 16px; }
+  .issue-actions { display: flex; gap: 8px; flex-wrap: wrap; justify-content: space-between; }
+  .issue-actions .left { display: flex; gap: 8px; flex-wrap: wrap; }
+  .gh-md { font-size: 0.8em; line-height: 1.6; overflow-wrap: anywhere; }
+  .gh-md > :first-child { margin-top: 0; }
+  .gh-md > :last-child { margin-bottom: 0; }
+  .gh-md p { margin: 0 0 8px; }
+  .gh-md img, .gh-md video { max-width: 100%; height: auto; }
+  .gh-md pre { background: var(--panel-2); padding: 10px; border-radius: 8px; overflow-x: auto; }
+  .gh-md code { background: var(--panel-2); padding: 0 4px; border-radius: 4px; }
+  .gh-md pre code { padding: 0; background: none; }
+  .gh-md blockquote { margin: 0 0 8px; padding: 0 10px; border-left: 3px solid var(--border); color: var(--muted); }
+  .gh-md table { border-collapse: collapse; display: block; overflow-x: auto; margin-bottom: 8px; }
+  .gh-md th, .gh-md td { border: 1px solid var(--border); padding: 4px 8px; }
+  .gh-md h1, .gh-md h2, .gh-md h3, .gh-md h4 { font-family: var(--font-head); font-size: 1.05em; margin: 12px 0 6px; }
+  .gh-md ul, .gh-md ol { padding-left: 22px; margin: 0 0 8px; }
+  .gh-md li.task-list-item { list-style: none; }
+  .gh-md li.task-list-item input { margin: 0 6px 0 -18px; }
+  .gh-md sub { color: var(--muted); }
+  .gh-md details summary { cursor: pointer; color: var(--muted); }
+  .gh-md hr { border: none; border-top: 1px solid var(--border); }
+  .gh-plain { white-space: pre-wrap; }
+  .md-editor { border: 1px solid var(--border); border-radius: 10px; overflow: hidden; margin-bottom: 10px; background: var(--panel); }
+  .md-tabs { display: flex; gap: 2px; background: var(--panel-2); border-bottom: 1px solid var(--border); align-items: center; padding: 0 6px; }
+  .md-tabs button { background: none; border: none; border-bottom: 2px solid transparent; border-radius: 0; padding: 7px 10px; font-size: 0.72em; color: var(--muted); }
+  .md-tabs button:hover { border-color: transparent; color: var(--text); }
+  .md-tabs button.on, .md-tabs button.on:hover { color: var(--text); border-bottom-color: var(--accent); }
+  .md-hint { margin-left: auto; color: var(--muted); font-size: 0.62em; padding-right: 4px; }
+  .field .md-editor textarea, .md-editor textarea {
+    width: 100%; border: none; border-radius: 0; background: var(--panel); color: var(--text);
+    padding: 10px 12px; font-family: inherit; font-size: 0.82em; resize: vertical; display: block; min-height: 90px;
+  }
+  .md-editor textarea:focus { outline: none; }
+  .md-preview { padding: 10px 12px; min-height: 90px; }
+  .inline-btns { display: flex; gap: 8px; flex-wrap: wrap; }
+
   /* ------------------------------------------------------------------ */
   /* Phones (<= 640px)                                                    */
   /* ------------------------------------------------------------------ */
@@ -368,7 +455,12 @@
     .toolbar .count, .toolbar .desk-only { display: none; }
     .toolbar button { padding: 8px 10px; }
     /* 16px stops iOS Safari zooming into the page when a field is tapped */
-    .row-input, .field input, .field select, .field textarea, input.mini { font-size: 16px; }
+    .row-input, .field input, .field select, .field textarea, input.mini,
+    .md-editor textarea, .field .md-editor textarea, .mini-select { font-size: 16px; }
+    .issues-bar .search { flex-basis: 100%; order: 5; }
+    .issues-bar .primary { margin-left: auto; }
+    .issue-row { padding: 10px 4px; }
+    .gh-post > .gh-md, .gh-edit { padding: 8px 10px; }
     .add-bar { gap: 8px; margin-bottom: 12px; }
     .filters { margin-bottom: 12px; }
     .filters .search { min-width: 0; flex-basis: 100%; }
@@ -400,7 +492,7 @@
 
     /* dialogs: nearly full screen, one column */
     .overlay { align-items: flex-end; }
-    .modal, .modal.wide {
+    .modal, .modal.wide, .modal.xwide {
       width: 100%; max-width: 100%; max-height: 92vh;
       border-radius: 16px 16px 0 0; padding: 16px 14px calc(16px + env(safe-area-inset-bottom));
     }
@@ -509,6 +601,8 @@ function App() {
   const [showHidden, setShowHidden] = useState(false);
   const isMobile = useIsMobile();
   const [menuOpen, setMenuOpen] = useState(false);
+  const [showIssues, setShowIssues] = useState(false);
+  const [issuesSeen, setIssuesSeen] = useState(() => lsGet(ISSUES_SEEN_KEY));
   useEffect(() => {   // close the ⋯ menu on any outside tap
     if (!menuOpen) return;
     const close = (e) => { if (!e.target.closest || !e.target.closest(".toolbar-menu")) setMenuOpen(false); };
@@ -676,6 +770,16 @@ function App() {
     window.location = (r && r.redirect) || "/login";
   };
 
+  // GitHub issues: open count + a dot when something changed since you last looked
+  const iss = s.issues || {};
+  useEffect(() => {
+    if (iss.latest && issuesSeen === null) { lsSet(ISSUES_SEEN_KEY, iss.latest); setIssuesSeen(iss.latest); }
+  }, [iss.latest]);
+  const issNew = !!(iss.enabled && iss.latest && issuesSeen !== null && iss.latest > issuesSeen);
+  const markIssuesSeen = () => { if (iss.latest) { lsSet(ISSUES_SEEN_KEY, iss.latest); setIssuesSeen(iss.latest); } };
+  const openIssues = () => { setMenuOpen(false); markIssuesSeen(); setShowIssues(true); };
+  useEffect(() => { if (showIssues) markIssuesSeen(); }, [showIssues, iss.latest]);   // seen while open
+
   const upd = ver && ver.update;
   return (
     <div className="wrap">
@@ -687,10 +791,11 @@ function App() {
             <button onClick={()=>setEditPool({color:"#8b5cf6"})} title="New pool">+ Pool</button>
             <button onClick={()=>setShowSettings(true)} className="ghost" title="Settings">⚙</button>
             <div className="toolbar-menu">
-              <button className="ghost mobile-menu-btn" title="More" onClick={()=>setMenuOpen(!menuOpen)}>⋯</button>
+              <button className="ghost mobile-menu-btn" title="More" onClick={()=>setMenuOpen(!menuOpen)}>⋯{issNew && <span className="new-dot"></span>}</button>
               {menuOpen && (
                 <div className="menu-pop" onClick={e=>e.stopPropagation()}>
                   <div className="menu-note">{state.total} devices{canSync ? ` · ${platformLabel}` : ""}</div>
+                  {iss.enabled && <button onClick={openIssues}>◎ Issues{iss.open ? ` (${iss.open} open)` : ""}{issNew && <span className="new-dot"></span>}</button>}
                   <button onClick={()=>{ setMenuOpen(false); window.location="/api/export.csv"; }}>⤓ Export CSV</button>
                   <button onClick={()=>setTheme(theme==="dark"?"light":"dark")}>
                     {theme==="dark" ? "☀ Light theme" : "🌙 Dark theme"}</button>
@@ -709,6 +814,12 @@ function App() {
           {canSync && <button onClick={sync} className="primary">⟳ Sync {platformLabel}</button>}
           <button onClick={()=>window.location="/api/export.csv"}>⤓ CSV</button>
           <button onClick={()=>setEditPool({color:"#8b5cf6"})}>+ Pool</button>
+          {iss.enabled && (
+            <button onClick={openIssues} title={`GitHub issues${iss.pending ? ` — ${iss.pending} change(s) waiting to send` : ""}`}>
+              ◎ Issues{iss.open ? <span className="count-badge">{iss.open}</span> : null}
+              {issNew && <span className="new-dot"></span>}
+            </button>
+          )}
           <button onClick={()=>setTheme(theme==="dark"?"light":"dark")} className="ghost"
             title="Toggle light / dark">{theme==="dark" ? "☀" : "🌙"}</button>
           <button className="ghost" title="Smaller text" style={{padding:"6px 9px"}}
@@ -789,6 +900,11 @@ function App() {
           onClose={()=>{ setFontPreview(null); setShowSettings(false); }}
           initialTab={typeof showSettings === "string" ? showSettings : undefined}
           reload={load} flash={flash} />
+      )}
+      {showIssues && (
+        <IssuesModal settings={s} flash={flash} onChanged={load}
+          onClose={()=>setShowIssues(false)}
+          openSettings={()=>{ setShowIssues(false); setShowSettings("maint"); }} />
       )}
       {showLog && ver && (
         <ChangelogModal ver={ver} setVer={setVer} onClose={closeLog} />
@@ -1306,6 +1422,7 @@ function SettingsModal({settings, excluded, onPreview, onClose, reload, flash, i
               onChange={e=>set("update_check",e.target.checked)} />
             Check for new versions every 6 hours{!settings.update_check_allowed && " — disabled by IPAM_UPDATE_CHECK"}</label></div>
           {settings.update_check_allowed && <UpdateSourceEditor flash={flash} />}
+          <IssuesSettings flash={flash} reload={reload} tokenField={!settings.update_check_allowed} />
           <div className="excluded-block">
             <label>Excluded devices {excluded.length ? `(${excluded.length})` : ""}</label>
             {excluded.length === 0
@@ -1561,7 +1678,8 @@ function UpdateSourceEditor({flash}) {
           placeholder={u.token_set ? "•••••••• (stored)" : "ghp_… or github_pat_…"}
           onChange={e => set("github_token", e.target.value)} />
         <div className="hint">
-          <b>Fine-grained token</b> (<code>github_pat_…</code>): give it <i>Contents: Read-only</i> on the repo above.
+          <b>Fine-grained token</b> (<code>github_pat_…</code>): give it <i>Contents: Read-only</i> on the repo above,
+          plus <i>Issues: Read and write</i> for the Issues panel.
           GitHub's container registry doesn't accept fine-grained tokens, so versions are read from the repo's
           CHANGELOG.md (the same place the build takes the version from).<br/>
           <b>Classic token</b> (<code>ghp_…</code>): <code>read:packages</code> for the image, plus <code>repo</code> for a private repo.<br/>
@@ -1793,6 +1911,531 @@ function SecurityTab({flash, reload}) {
 
 // Minimal markdown for CHANGELOG.md: ### headings, "- " bullets (with
 // indented continuation lines), paragraphs, **bold**, *em* and `code`.
+// ---------------------------------------------------------------------------
+// GitHub issues: list / detail / new issue, backed by the local copy that the
+// server keeps in two-way sync with the repo (see issues.py)
+// ---------------------------------------------------------------------------
+const ISSUES_SEEN_KEY = "ipam-issues-seen";
+const ISSUE_DRAFT_KEY = "ipam-issue-draft";
+
+function ago(when) {
+  if (!when) return "";
+  const t = typeof when === "number" ? when * 1000 : Date.parse(when);
+  const s = Math.max(0, (Date.now() - t) / 1000);
+  if (s < 60) return "just now";
+  if (s < 3600) return `${Math.floor(s / 60)}m ago`;
+  if (s < 86400) return `${Math.floor(s / 3600)}h ago`;
+  if (s < 30 * 86400) return `${Math.floor(s / 86400)}d ago`;
+  return new Date(t).toLocaleDateString();
+}
+
+function LabelChip({l, on, onClick}) {
+  const c = l.color ? "#" + l.color : null;
+  const style = c ? {borderColor: c, background: on === false ? "transparent" : hexToRgba(c, 0.18)} : {};
+  return (
+    <span className={"gh-label" + (onClick ? " pick" : "") + (on === false ? " off" : "")}
+      style={style} onClick={onClick}>
+      {c && <span className="gh-label-dot" style={{background: c}}></span>}{l.name}
+    </span>
+  );
+}
+
+function LabelPicker({all, value, onChange}) {
+  if (!all.length) return <div className="hint">This repo has no labels yet.</div>;
+  return (
+    <div className="label-pick">
+      {all.map(l => {
+        const on = value.includes(l.name);
+        return <LabelChip key={l.name} l={l} on={on}
+          onClick={() => onChange(on ? value.filter(x => x !== l.name) : [...value, l.name])} />;
+      })}
+    </div>
+  );
+}
+
+function StateBadge({it}) {
+  const cls = it.state === "open" ? "open" : it.state_reason === "not_planned" ? "not_planned" : "closed";
+  const txt = it.state === "open" ? "Open" : it.state_reason === "not_planned" ? "Not planned" : "Closed";
+  return <span className={"state-badge " + cls}>{txt}</span>;
+}
+
+// HTML rendered (and sanitized) by GitHub, cleaned again by the server
+function GhHtml({html, text, empty}) {
+  const ref = React.useRef(null);
+  useEffect(() => {
+    if (!ref.current) return;
+    ref.current.querySelectorAll("a[href]").forEach(a => { a.target = "_blank"; a.rel = "noopener noreferrer"; });
+  }, [html]);
+  if (!html) return <div className="gh-md gh-plain">{text || <i className="muted">{empty || "No description."}</i>}</div>;
+  return <div className="gh-md" ref={ref} dangerouslySetInnerHTML={{__html: html}} />;
+}
+
+function MdEditor({value, onChange, placeholder, rows, autoFocus}) {
+  const [tab, setTab] = useState("write");
+  const [html, setHtml] = useState(null);
+  const [err, setErr] = useState(null);
+  const preview = async () => {
+    setTab("preview"); setHtml(null); setErr(null);
+    const r = await api("/api/issues/preview", {method: "POST", body: JSON.stringify({text: value})});
+    if (r.error) setErr(r.error); else setHtml(r.html || "");
+  };
+  return (
+    <div className="md-editor">
+      <div className="md-tabs">
+        <button className={tab === "write" ? "on" : ""} onClick={() => setTab("write")}>Write</button>
+        <button className={tab === "preview" ? "on" : ""} onClick={preview}>Preview</button>
+        <span className="md-hint">Markdown</span>
+      </div>
+      {tab === "write"
+        ? <textarea value={value} rows={rows || 6} placeholder={placeholder} autoFocus={autoFocus}
+            onChange={e => onChange(e.target.value)} />
+        : <div className="md-preview">
+            {err ? <span className="err-line">{err}</span>
+              : html === null ? <span className="muted">Rendering…</span>
+              : <GhHtml html={html} empty="Nothing to preview." />}
+          </div>}
+    </div>
+  );
+}
+
+function appInfo(s) {
+  return ["", "", "<details><summary>App info</summary>", "",
+    `- Version: ${s.version}`,
+    `- Sync platform: ${s.platform_label || s.platform}`,
+    `- Browser: ${navigator.userAgent}`,
+    `- Window: ${window.innerWidth}×${window.innerHeight}`,
+    "", "</details>"].join("\n");
+}
+
+function IssuesModal({settings, onClose, openSettings, flash, onChanged}) {
+  const [data, setData] = useState(null);          // {status, labels, issues}
+  const [view, setView] = useState("list");        // "list" | "new" | issue number
+  const [filter, setFilter] = useState(lsGet("ipam-issues-filter") || "open");
+  const [q, setQ] = useState("");
+  const [label, setLabel] = useState("");
+  const [limit, setLimit] = useState(100);
+  const [syncing, setSyncing] = useState(false);
+
+  const load = useCallback(async () => {
+    const r = await api("/api/issues");
+    if (r.status) setData(r);
+    return r;
+  }, []);
+  const doSync = async (full) => {
+    setSyncing(true);
+    const r = await api("/api/issues/sync", {method: "POST", body: JSON.stringify({full: !!full})});
+    setSyncing(false);
+    if (!r.ok && r.error) flash("Issues sync failed: " + r.error);
+    else if (r.sent) flash(`Sent ${r.sent} waiting change${r.sent > 1 ? "s" : ""} to GitHub`);
+    await load();
+    onChanged();
+  };
+  useEffect(() => {
+    load().then(r => {
+      const st = r && r.status;
+      if (st && st.enabled && st.repo && Date.now() / 1000 - st.last_sync > 60) doSync(false);
+    });
+  }, []);
+  useEffect(() => { const t = setInterval(load, 30000); return () => clearInterval(t); }, [load]);
+  useEffect(() => { lsSet("ipam-issues-filter", filter); }, [filter]);
+
+  const changed = async () => { await load(); onChanged(); };
+  const st = data && data.status;
+  const allLabels = (data && data.labels) || [];
+  const colorOf = (l) => l.color ? l : ({...l, color: (allLabels.find(x => x.name === l.name) || {}).color || ""});
+
+  const retry = async (id) => {
+    const r = await api(`/api/issues/outbox/${id}/retry`, {method: "POST"});
+    flash(r.sent ? "Sent to GitHub" : "Still not sent: " + (r.error || "unknown error"));
+    changed();
+  };
+  const discard = async (id) => {
+    if (!confirm("Discard this change? It hasn't reached GitHub and will be lost.")) return;
+    await api(`/api/issues/outbox/${id}`, {method: "DELETE"});
+    if (typeof view === "number" && view < 0 && -view === id) setView("list");
+    changed();
+  };
+
+  let body;
+  if (!st) {
+    body = <div className="empty-issues">Loading…</div>;
+  } else if (!st.enabled) {
+    body = <div className="help-box">GitHub issues are turned off.{" "}
+      {st.allowed && <button className="link" onClick={openSettings}>Turn them on in Settings → Maintenance</button>}</div>;
+  } else if (view === "new") {
+    body = <NewIssueForm labels={allLabels} settings={settings} flash={flash}
+      onCancel={() => setView("list")}
+      onCreated={(n) => { changed(); setView(n); }} />;
+  } else if (typeof view === "number") {
+    body = <IssueDetail number={view} labels={allLabels} colorOf={colorOf} flash={flash}
+      onBack={() => { setView("list"); load(); }} onChanged={changed} onGone={() => { setView("list"); changed(); }} />;
+  } else {
+    const issues = data.issues;
+    const counts = {open: issues.filter(i => i.state === "open").length};
+    counts.closed = issues.length - counts.open;
+    counts.all = issues.length;
+    const qq = q.trim().toLowerCase();
+    const shown = issues.filter(i =>
+      (filter === "all" || i.state === filter) &&
+      (!label || i.labels.some(l => l.name === label)) &&
+      (!qq || i.title.toLowerCase().includes(qq) || String(i.number) === qq.replace("#", "") ||
+       (i.author || "").toLowerCase().includes(qq)));
+    body = <>
+      <div className="issues-bar">
+        <Segmented value={filter} onChange={setFilter}
+          options={[["open", `Open ${counts.open}`], ["closed", `Closed ${counts.closed}`], ["all", `All ${counts.all}`]]} />
+        <input className="row-input search" placeholder="Search title, #, author…" value={q}
+          onChange={e => setQ(e.target.value)} />
+        {allLabels.length > 0 && (
+          <select className="mini-select" value={label} onChange={e => setLabel(e.target.value)}>
+            <option value="">All labels</option>
+            {allLabels.map(l => <option key={l.name} value={l.name}>{l.name}</option>)}
+          </select>
+        )}
+        <button className="primary" onClick={() => setView("new")}>+ New issue</button>
+      </div>
+      {shown.length === 0
+        ? <div className="empty-issues">
+            {issues.length === 0
+              ? (st.last_ok ? "No issues in this repo yet." : "Nothing synced yet.")
+              : "No issues match."}
+          </div>
+        : shown.slice(0, limit).map(i => (
+          <div className="issue-row" key={i.number} onClick={() => setView(i.number)}>
+            <span className={"issue-icon " + (i.state === "open" ? "open" : i.state_reason === "not_planned" ? "not_planned" : "closed")}
+              title={i.state}>{i.state === "open" ? "◉" : i.state_reason === "not_planned" ? "⊘" : "✓"}</span>
+            <div className="issue-main">
+              <div className="issue-title-line">
+                {i.title}{" "}
+                {i.labels.map(l => <LabelChip key={l.name} l={colorOf(l)} />)}
+              </div>
+              <div className="issue-sub">
+                {i.number > 0 ? `#${i.number}` : "new"} · @{i.author || "?"} · updated {ago(i.updated_at)}
+                {i.pending && <span className="tag pend">⏳ not sent</span>}
+              </div>
+            </div>
+            {i.comments > 0 && <span className="issue-cc" title="Comments">💬 {i.comments}</span>}
+          </div>
+        ))}
+      {shown.length > limit && (
+        <div className="empty-issues"><button onClick={() => setLimit(limit + 200)}>Show more ({shown.length - limit})</button></div>
+      )}
+    </>;
+  }
+
+  return (
+    <div className="overlay" onClick={onClose}>
+      <div className="modal xwide issues-modal" onClick={e => e.stopPropagation()}>
+        <CloseX onClick={onClose} />
+        <h3>Issues{st && st.repo && <a className="gh-repo" href={`https://github.com/${st.repo}/issues`}
+          target="_blank" rel="noopener noreferrer">{st.repo} ↗</a>}</h3>
+        {st && st.enabled && <>
+          <div className="issues-status">
+            <span>{st.last_ok ? `Synced ${ago(st.last_ok)}` : "Not synced yet"}
+              {st.login ? ` · posting as @${st.login}` : ""}</span>
+            <button className="mini-btn" disabled={syncing} onClick={() => doSync(false)}>
+              {syncing ? "Syncing…" : "⟳ Sync"}</button>
+            {st.error && <span className="err-line">⚠ {st.error}</span>}
+          </div>
+          {!st.token_set && (
+            <div className="help-box">No GitHub token yet, so issues are read-only (public repos only) and anything
+              you write waits here. Add a token with <i>Issues: Read and write</i> in{" "}
+              <button className="link" onClick={openSettings}>Settings → Maintenance</button>.</div>
+          )}
+          {st.outbox.length > 0 && (
+            <div className="outbox">
+              <b>⏳ {st.outbox.length} change{st.outbox.length > 1 ? "s" : ""} not sent to GitHub yet</b>
+              {st.outbox.map(o => (
+                <div className="outbox-row" key={o.id}>
+                  <span className="what">{o.what}
+                    {o.last_error && <span className="err-line"> — {o.last_error}</span>}</span>
+                  <button onClick={() => retry(o.id)}>Retry</button>
+                  <button className="danger" onClick={() => discard(o.id)}>Discard</button>
+                </div>
+              ))}
+            </div>
+          )}
+        </>}
+        {body}
+      </div>
+    </div>
+  );
+}
+
+function NewIssueForm({labels, settings, onCancel, onCreated, flash}) {
+  const [f, setF] = useState(() => {
+    try { return JSON.parse(lsGet(ISSUE_DRAFT_KEY)) || {title: "", body: "", labels: []}; }
+    catch (e) { return {title: "", body: "", labels: []}; }
+  });
+  const [info, setInfo] = useState(false);
+  const [busy, setBusy] = useState(false);
+  useEffect(() => { lsSet(ISSUE_DRAFT_KEY, JSON.stringify(f)); }, [f]);   // survives closing the dialog
+  const set = (k, v) => setF(prev => ({...prev, [k]: v}));
+  const submit = async () => {
+    if (!f.title.trim()) { flash("Give the issue a title"); return; }
+    setBusy(true);
+    const r = await api("/api/issues", {method: "POST",
+      body: JSON.stringify({...f, body: f.body + (info ? appInfo(settings) : "")})});
+    setBusy(false);
+    if (!r.ok) { flash(r.error || "Couldn't create the issue"); return; }
+    lsSet(ISSUE_DRAFT_KEY, "");
+    flash(r.sent ? `Opened #${r.issue.number} on GitHub` : "Saved here, not sent yet: " + (r.error || "will retry"));
+    onCreated(r.issue.number);
+  };
+  return (
+    <div className="issue-view">
+      <button className="link back" onClick={onCancel}>← All issues</button>
+      <div className="field" style={{marginTop: "10px"}}><label>Title</label>
+        <input value={f.title} maxLength="256" autoFocus onChange={e => set("title", e.target.value)}
+          placeholder="Short summary" /></div>
+      <div className="field"><label>Description</label>
+        <MdEditor value={f.body} onChange={v => set("body", v)} rows={8}
+          placeholder="What happened, what you expected, steps to reproduce…" /></div>
+      {labels.length > 0 && <div className="field"><label>Labels</label>
+        <LabelPicker all={labels} value={f.labels} onChange={v => set("labels", v)} /></div>}
+      <div className="field check"><label>
+        <input type="checkbox" checked={info} onChange={e => setInfo(e.target.checked)} />
+        Add app info (version, sync platform, browser) — handy for bug reports</label></div>
+      <div className="modal-actions">
+        <button onClick={() => { lsSet(ISSUE_DRAFT_KEY, ""); onCancel(); }}>Discard draft</button>
+        <button className="primary" disabled={busy || !f.title.trim()} onClick={submit}>
+          {busy ? "Submitting…" : "Submit issue"}</button>
+      </div>
+    </div>
+  );
+}
+
+function IssueDetail({number, labels, colorOf, flash, onBack, onChanged, onGone}) {
+  const [d, setD] = useState(null);
+  const [err, setErr] = useState(null);
+  const [busy, setBusy] = useState(false);
+  const [comment, setComment] = useState("");
+  const [editTitle, setEditTitle] = useState(null);
+  const [editBody, setEditBody] = useState(null);
+  const [editLabels, setEditLabels] = useState(null);
+  const [editC, setEditC] = useState(null);       // {id, body}
+
+  const load = async (refresh) => {
+    const r = await api(`/api/issues/${number}${refresh ? "?refresh=1" : ""}`);
+    if (!r.issue) { if (refresh || !d) { flash(r.error || "Issue not found"); onGone(); } return; }
+    setD(r);
+    setErr(r.error || null);
+  };
+  useEffect(() => {
+    setD(null); setComment(""); setEditTitle(null); setEditBody(null); setEditLabels(null); setEditC(null);
+    load(false).then(() => { if (number > 0) load(true); });
+  }, [number]);
+
+  // every change goes to the server, which applies it here and sends it to GitHub
+  const act = async (path, method, payload, okMsg) => {
+    setBusy(true);
+    const r = await api(path, {method, body: payload ? JSON.stringify(payload) : undefined});
+    setBusy(false);
+    if (!r.ok) { flash(r.error || "Failed"); return false; }
+    flash(r.sent ? okMsg : "Saved here, not sent to GitHub yet: " + (r.error || "will retry"));
+    await load(false);
+    onChanged();
+    return true;
+  };
+  const patch = (payload, msg) => act(`/api/issues/${number}`, "PATCH", payload, msg);
+
+  if (!d) return <div className="empty-issues">Loading…</div>;
+  const it = d.issue;
+  const live = it.number > 0;
+  const mine = (c) => c.id > 0 && d.login && c.author === d.login;
+
+  const postComment = async () => {
+    if (await act(`/api/issues/${number}/comments`, "POST", {body: comment}, "Comment posted")) setComment("");
+  };
+  const setState = async (state, reason) => {
+    if (comment.trim()) {
+      if (!await act(`/api/issues/${number}/comments`, "POST", {body: comment}, "Comment posted")) return;
+      setComment("");
+    }
+    await patch({state, state_reason: reason}, state === "open" ? "Issue reopened" : "Issue closed");
+  };
+  const delComment = async (c) => {
+    if (!confirm("Delete this comment on GitHub?")) return;
+    act(`/api/issues/comments/${c.id}`, "DELETE", null, "Comment deleted");
+  };
+
+  return (
+    <div className="issue-view">
+      <button className="link back" onClick={onBack}>← All issues</button>
+      {editTitle !== null
+        ? <div className="inline-add">
+            <input className="mini" value={editTitle} maxLength="256" autoFocus onChange={e => setEditTitle(e.target.value)} />
+            <button className="primary" disabled={busy || !editTitle.trim()}
+              onClick={async () => { if (await patch({title: editTitle}, "Title saved")) setEditTitle(null); }}>Save</button>
+            <button onClick={() => setEditTitle(null)}>Cancel</button>
+          </div>
+        : <h4>{it.title} <span className="muted">{live ? `#${it.number}` : ""}</span>
+            {live && <button className="link small" onClick={() => setEditTitle(it.title)}>edit</button>}</h4>}
+      <div className="issue-meta">
+        <StateBadge it={it} />
+        <span><b>@{it.author || "?"}</b> opened {ago(it.created_at)} · {it.comments} comment{it.comments === 1 ? "" : "s"}</span>
+        {it.html_url && <a href={it.html_url} target="_blank" rel="noopener noreferrer">GitHub ↗</a>}
+        {it.pending && <span className="tag pend">⏳ not sent</span>}
+      </div>
+      {err && <div className="err-line small-err">Couldn't refresh from GitHub: {err}</div>}
+      <div className="issue-labels">
+        {editLabels !== null
+          ? <>
+              <LabelPicker all={labels} value={editLabels} onChange={setEditLabels} />
+              <button className="primary mini-btn" disabled={busy}
+                onClick={async () => { if (await patch({labels: editLabels}, "Labels saved")) setEditLabels(null); }}>Save labels</button>{" "}
+              <button className="mini-btn" onClick={() => setEditLabels(null)}>Cancel</button>
+            </>
+          : <>
+              {it.labels.map(l => <LabelChip key={l.name} l={colorOf(l)} />)}
+              {live && labels.length > 0 && <button className="link small" onClick={() => setEditLabels(it.labels.map(l => l.name))}>
+                {it.labels.length ? "edit labels" : "+ labels"}</button>}
+            </>}
+      </div>
+
+      <div className="gh-post">
+        <div className="gh-post-head"><b>@{it.author || "?"}</b><span>{ago(it.created_at)}</span><span className="spacer"></span>
+          {live && editBody === null && <button className="link small" onClick={() => setEditBody(it.body)}>edit</button>}</div>
+        {editBody !== null
+          ? <div className="gh-edit">
+              <MdEditor value={editBody} onChange={setEditBody} rows={8} />
+              <div className="right-btns">
+                <button onClick={() => setEditBody(null)}>Cancel</button>
+                <button className="primary" disabled={busy}
+                  onClick={async () => { if (await patch({body: editBody}, "Description saved")) setEditBody(null); }}>Save</button>
+              </div>
+            </div>
+          : <GhHtml html={it.body_html} text={it.body} />}
+      </div>
+
+      {d.comments.map(c => (
+        <div className="gh-post" key={c.id}>
+          <div className="gh-post-head"><b>@{c.author || "?"}</b><span>{ago(c.created_at)}</span>
+            {c.pending && <span className="tag pend">⏳ not sent</span>}
+            <span className="spacer"></span>
+            {c.html_url && <a href={c.html_url} target="_blank" rel="noopener noreferrer">↗</a>}
+            {mine(c) && (!editC || editC.id !== c.id) && <>
+              <button className="link small" onClick={() => setEditC({id: c.id, body: c.body})}>edit</button>
+              <button className="link small danger-link" onClick={() => delComment(c)}>delete</button>
+            </>}
+          </div>
+          {editC && editC.id === c.id
+            ? <div className="gh-edit">
+                <MdEditor value={editC.body} onChange={v => setEditC({...editC, body: v})} rows={5} />
+                <div className="right-btns">
+                  <button onClick={() => setEditC(null)}>Cancel</button>
+                  <button className="primary" disabled={busy || !editC.body.trim()}
+                    onClick={async () => { if (await act(`/api/issues/comments/${c.id}`, "PATCH", {body: editC.body}, "Comment saved")) setEditC(null); }}>Save</button>
+                </div>
+              </div>
+            : <GhHtml html={c.body_html} text={c.body} />}
+        </div>
+      ))}
+
+      {live
+        ? <div className="gh-reply">
+            <MdEditor value={comment} onChange={setComment} rows={4} placeholder="Leave a comment" />
+            <div className="issue-actions">
+              <div className="left">
+                {it.state === "open"
+                  ? <>
+                      <button disabled={busy} onClick={() => setState("closed", "completed")}>
+                        ✓ Close{comment.trim() ? " with comment" : ""}</button>
+                      <button disabled={busy} onClick={() => setState("closed", "not_planned")}>⊘ Not planned</button>
+                    </>
+                  : <button disabled={busy} onClick={() => setState("open", "reopened")}>
+                      ↺ Reopen{comment.trim() ? " with comment" : ""}</button>}
+              </div>
+              <button className="primary" disabled={busy || !comment.trim()} onClick={postComment}>Comment</button>
+            </div>
+          </div>
+        : <div className="help-box">This issue hasn't reached GitHub yet. It's sent automatically on the next
+            sync (or use Retry above); after that you can comment, edit and label it.</div>}
+    </div>
+  );
+}
+
+function IssuesSettings({flash, reload, tokenField}) {
+  const [st, setSt] = useState(null);
+  const [f, setF] = useState(null);
+  const [tok, setTok] = useState("");
+  const [busy, setBusy] = useState(false);
+  const fill = (s) => {
+    setSt(s);
+    setF({issues_enabled: s.enabled, issues_repo: s.repo_setting, issues_sync_minutes: s.sync_minutes,
+          issues_signature: s.signature});
+  };
+  useEffect(() => { api("/api/issues/settings").then(r => r.status && fill(r.status)); }, []);
+  if (!st || !f) return null;
+  const set = (k, v) => setF(prev => ({...prev, [k]: v}));
+  const locked = (k) => (st.locked || []).includes(k);
+  if (!st.allowed) return (
+    <div className="update-src"><div className="section-label" style={{marginTop: 0}}>GitHub issues</div>
+      <div className="hint">Turned off by <code>IPAM_ISSUES</code>.</div></div>
+  );
+  const save = async (full) => {
+    setBusy(true);
+    if (tok.trim()) {
+      const t = await api("/api/update/settings", {method: "PUT", body: JSON.stringify({github_token: tok.trim()})});
+      if (t.error) { setBusy(false); flash(t.error); return; }
+    }
+    const r = await api("/api/issues/settings", {method: "PUT", body: JSON.stringify({...f, sync: !full})});
+    let res = r.sync;
+    if (!r.error && full && f.issues_enabled) {
+      res = await api("/api/issues/sync", {method: "POST", body: JSON.stringify({full: true})});
+      if (res.status) r.status = res.status;
+    }
+    setBusy(false);
+    if (r.error) { flash(r.error); return; }
+    setTok("");
+    fill(r.status);
+    flash(!res ? "Saved" : res.ok ? `Issues synced — ${res.issues} issue${res.issues === 1 ? "" : "s"}, ${res.comments} comment${res.comments === 1 ? "" : "s"} updated`
+                                  : "Saved — sync failed: " + res.error);
+    reload();
+  };
+  return (
+    <div className="update-src">
+      <div className="section-label" style={{marginTop: 0}}>GitHub issues</div>
+      <div className="field check"><label>
+        <input type="checkbox" checked={!!f.issues_enabled} onChange={e => set("issues_enabled", e.target.checked)} />
+        Show an Issues panel that syncs both ways with the repo's GitHub issues</label></div>
+      <div className="field"><label>Repo {locked("issues_repo") && <span className="tag env">set by IPAM_ISSUES_REPO</span>}</label>
+        <input value={locked("issues_repo") ? st.repo : f.issues_repo} disabled={locked("issues_repo")}
+          placeholder={`${st.default_repo} (same as update source)`}
+          onChange={e => set("issues_repo", e.target.value)} /></div>
+      <div className="field"><label>Sync every (minutes, 0 = only when the panel opens)</label>
+        <input type="number" min="0" max="1440" value={f.issues_sync_minutes}
+          onChange={e => set("issues_sync_minutes", e.target.value)} /></div>
+      <div className="field check"><label>
+        <input type="checkbox" checked={!!f.issues_signature} onChange={e => set("issues_signature", e.target.checked)} />
+        Sign issues and comments with "Sent from {"<app name>"} by {"<user>"}" — everything is posted as the
+        token's GitHub account, so this shows who wrote it</label></div>
+      {tokenField && !locked("github_token") && (
+        <div className="field"><label>GitHub token {st.token_set && <span style={{color: "var(--ok)"}}>✓ saved — leave blank to keep</span>}</label>
+          <input type="password" autoComplete="off" value={tok} onChange={e => setTok(e.target.value)}
+            placeholder={st.token_set ? "•••••••• (stored)" : "github_pat_…"} /></div>
+      )}
+      <div className="hint" style={{marginBottom: "8px"}}>
+        Uses the GitHub token from {tokenField ? "here" : "Update source above"}
+        {st.token_set ? ` (${st.token_kind}, saved)` : " — none saved yet"}. A fine-grained token needs
+        {" "}<i>Issues: Read and write</i> on the repo (plus <i>Contents: Read-only</i> for update checks);
+        a classic token needs <code>repo</code>. Changes made here go to GitHub straight away; if GitHub can't
+        be reached they wait and are sent on the next sync.</div>
+      <div className="update-status">
+        <div>Last sync: {st.last_sync ? new Date(st.last_sync * 1000).toLocaleString() : "never"}
+          {st.login ? ` · posting as @${st.login}` : ""}
+          {st.outbox.length ? ` · ${st.outbox.length} waiting to send` : ""}</div>
+        {st.error && <div className="err-line">{st.error}</div>}
+      </div>
+      <div className="inline-btns">
+        <button className="primary" onClick={() => save(false)} disabled={busy}>{busy ? "Syncing…" : "Save & sync now"}</button>
+        <button onClick={() => save(true)} disabled={busy || !f.issues_enabled}
+          title="Rebuild the local copy from GitHub (picks up deleted or moved issues)">Full resync</button>
+      </div>
+    </div>
+  );
+}
+
 function inlineMd(text) {
   return text.split(/(\*\*[^*]+\*\*|`[^`]+`|\*[^*]+\*)/g).map((part, i) => {
     if (/^\*\*[^*]+\*\*$/.test(part)) return <b key={i}>{part.slice(2,-2)}</b>;
