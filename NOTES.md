@@ -1,6 +1,10 @@
 # Notes — open items
 
 ## Blocked on the user
+- **Issues panel (1.7) needs a token permission.** Edit the fine-grained token used
+  for update checks and add *Issues: Read and write* on this repo. Until then the
+  panel can read but posts wait as "not sent"; they go out on the next sync once
+  the permission is added.
 - **Backfill GitHub Releases v1.0–v1.5.**
   - Add a `RELEASE_TOKEN` repo secret. Either works:
     - a fine-grained PAT on this repo with Contents and Workflows set to read & write
